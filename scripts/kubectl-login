@@ -201,7 +201,7 @@ setup() {
     kubectl config set-credentials oidc \
             --exec-api-version=client.authentication.k8s.io/v1beta1 \
             --exec-command=kubectl \
-            --exec-arg=oidc,--token
+            --exec-arg=login,--token
 
     echo
     echo "Make sure you can access the Kubernetes cluster:"
