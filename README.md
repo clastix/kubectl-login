@@ -57,7 +57,7 @@ Usage: /usr/local/bin/kubectl-login [OPTIONS]
 Create an initial setup:
 
 ```bash
-$ kubectl oidc --setup
+$ kubectl login --setup
 [Thu Jan  7 13:04:55 CET 2021][INFO] Checking if prerequisites are installed
 [Thu Jan  7 13:04:55 CET 2021][INFO] Starting OIDC login with PKCE
 [Thu Jan  7 13:04:55 CET 2021][INFO] Getting OIDC configuration from https://sso.clastix.io/auth/realms/caas
