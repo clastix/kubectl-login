@@ -1,0 +1,291 @@
+#!/bin/bash
+
+# An OIDC Identity Provider issues you three types of tokens:
+# - refresh-token
+# - id-token
+# - access-token
+# The access-token can generally be disregarded for Kubernetes.
+# It would be used if the Identity Provider was managing roles and permissions,
+# but that is done in Kubernetes itself with RBAC.
+# The id-token is short lived while the refresh-token has longer expiration.
+# The refresh-token is used to fetch a new id-token when the id-token expires.
+
+set -e
+set -o pipefail
+
+BIN_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PATH=$PATH:$BIN_DIR
+CONFIG=~/.kube/oidc.conf
+CACHE=~/.kube/oidc.cache
+source "$CONFIG"
+
+check_prerequisites() {
+    echo "[$(date)][INFO] Checking if prerequisites are installed"
+
+    # Check if jq is installed
+    if [ ! -x "$(command -v jq)" ]; then
+        echo "[$(date)][ERROR] jq not found: install it before to run"
+        exit 1
+    fi
+
+    # Check if curl is installed
+    if [ ! -x "$(command -v curl)" ]; then
+        echo "[$(date)][ERROR] curl not found: install it before to run"
+        exit 1
+    fi
+
+    # Check if kubectl is installed
+    if [ ! -x "$(command -v kubectl)" ]; then
+        echo "[$(date)][ERROR] kubectl not found: install it before to run"
+        exit 1
+    fi
+
+    # Check if openssl is installed
+    if [ ! -x "$(command -v openssl)" ]; then
+        echo "[$(date)][ERROR] openssl not found: install it before to run"
+        exit 1
+    fi
+
+    # Check if base64 is installed
+    if [ ! -x "$(command -v base64)" ]; then
+        echo "[$(date)][ERROR] base64 not found: install it before to run"
+        exit 1
+    fi
+}
+
+get_openid_config() {
+
+    echo "[$(date)][INFO] Getting OIDC configuration from $OIDC_SERVER"
+
+    OPENID=`curl -k -s ${OIDC_SERVER}/.well-known/openid-configuration`
+
+    ERROR=$(echo "$OPENID" | jq .error -r)
+    if [ "$ERROR" != "null" ];then
+        echo "[$(date)][ERROR]  $OPENID" >&2
+        exit 1
+    fi
+
+    AUTH_ENDPOINT=`echo ${OPENID} | jq .authorization_endpoint -r`
+    TOKEN_ENDPOINT=`echo ${OPENID} | jq .token_endpoint -r`
+    INTROSPECTION_ENDPOINT=`echo ${OPENID} | jq .introspection_endpoint -r`
+    USERINFO_ENDPOINT=`echo ${OPENID} | jq .userinfo_endpoint -r`
+    END_SESSION_ENDPOINT=`echo ${OPENID} | jq .end_session_endpoint -r`
+    GRANT_TYPES=`echo ${OPENID} | jq .grant_types_supported -r`
+    RESPONSE_TYPE=`echo ${OPENID} | jq .response_types_supported -r`
+    RESPONSE_MODES=`echo ${OPENID} | jq .response_modes_supported -r`
+    CLAIMS=`echo ${OPENID} | jq .claims_supported -r`
+    SCOPES=`echo ${OPENID} | jq .scopes_supported -r`
+    CODE_CHALLENGE_METHODS=`echo ${OPENID} | jq .code_challenge_methods_supported -r`
+}
+
+save_config() {
+    echo "[$(date)][INFO] Saving configuration to $CONFIG"
+cat > $CONFIG <<EOF
+OIDC_SERVER=${OIDC_SERVER}
+OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+PKCE=${PKCE}
+CODE_CHALLENGE_METHOD=${CODE_CHALLENGE_METHOD}
+REDIRECT_URI=${REDIRECT_URI}
+AUTH_ENDPOINT=${AUTH_ENDPOINT}
+TOKEN_ENDPOINT=${TOKEN_ENDPOINT}
+INTROSPECTION_ENDPOINT=${INTROSPECTION_ENDPOINT}
+USERINFO_ENDPOINT=${USERINFO_ENDPOINT}
+END_SESSION_ENDPOINT=${END_SESSION_ENDPOINT}
+EOF
+
+#GRANT_TYPES=${GRANT_TYPES}
+#RESPONSE_TYPE=${RESPONSE_TYPE}
+#RESPONSE_MODES=${RESPONSE_MODES}
+#CLAIMS=${CLAIMS}
+#SCOPES=${SCOPES}
+#CODE_CHALLENGE_METHODS=${CODE_CHALLENGE_METHODS}
+
+}
+
+gen_pkce() {
+    echo "[$(date)][INFO] Generating PKCE Code Verifier and Challenge"
+    # Length of code_verifier should be no less than 43 characters and no more than 128 characters,
+    # and Base64URL encoded
+    CODE_VERIFIER=`openssl rand -base64 50 | tr -dc A-Za-z0-9` 
+    # challenge = base64url(sha256(code_verifier))
+	CODE_CHALLENGE=`echo -n ${CODE_VERIFIER} | shasum -a 256 | cut -d " " -f 1 | xxd -r -p | base64 | tr / _ | tr + - | tr -d =`
+}
+
+create_auth_uri() {
+    echo "[$(date)][INFO] Creating authorization URI"
+    STATE=`openssl rand -base64 32 | tr -dc A-Za-z0-9`
+    QUERY="response_type=code&client_id="${OIDC_CLIENT_ID}"&redirect_uri="${REDIRECT_URI}"&scope=openid+groups+offline_access&state="${STATE}"&code_challenge="${CODE_CHALLENGE}"&prompt=consent&code_challenge_method="${CODE_CHALLENGE_METHOD}"&access_type=offline"
+    AUTH_URI=${AUTH_ENDPOINT}?${QUERY}
+    echo
+    echo "Go to the following link in your browser:"
+    echo
+    echo $AUTH_URI
+}
+
+get_code() {
+    echo
+    read -p "Enter verification code: " CODE
+    echo
+}
+
+get_token() {
+    echo "[$(date)][INFO] Requesting token from $OIDC_SERVER"
+
+    TOKEN=`curl -k -s $TOKEN_ENDPOINT \
+    -d grant_type=authorization_code \
+    -d response_type=id_token \
+    -d client_id=$OIDC_CLIENT_ID \
+    -d client_secret=$OIDC_CLIENT_SECRET \
+    -d code=$CODE \
+    -d code_verifier=$CODE_VERIFIER \
+    -d redirect_uri=$REDIRECT_URI`
+
+    ERROR=$(echo "$TOKEN" | jq .error -r)
+    if [ "$ERROR" != "null" ];then
+        echo "[$(date)][ERROR]  $TOKEN" >&2
+        exit 1
+    fi
+
+    echo "[$(date)][INFO] Saving token to cache"
+    echo ${TOKEN} > $CACHE
+}
+
+decode_base64() {
+  local length=$(( ${#1} % 4 ))
+  local result=${1}
+  if (( length == 2 ))
+  then
+    result="$1"'=='
+  elif (( length == 3 ))
+  then
+    result="$1"'='
+  fi
+  echo -n $result | tr -- '-_' '+/' | base64 --decode
+}
+
+exp_jwt() {
+    decode_base64 $(echo -n $1 | cut -d "." -f 2) | jq .exp -r 
+}
+
+usage() {
+cat <<EOF
+Usage: $0 [OPTIONS]
+
+    OPTIONS:
+    --help     display usage
+    --login    login to the OIDC Server
+    --token    return a valid id_token 
+    --setup    configure current kubeconfig 
+ 
+EOF
+}
+
+setup() {
+    echo "[$(date)][INFO] Configuring current kubeconfig"
+
+    kubectl config set-credentials oidc \
+            --exec-api-version=client.authentication.k8s.io/v1beta1 \
+            --exec-command=kubectl \
+            --exec-arg=oidc,--token
+
+    echo
+    echo "Make sure you can access the Kubernetes cluster:"
+    echo
+    echo "      $ kubectl --user=oidc get pods"
+    echo
+    echo "You can switch the current context:"
+    echo
+    echo "      $ kubectl config set-context --current --user=oidc"
+    echo
+    echo "Or you can set a new context:"
+    echo
+    echo "      $ kubectl config set-context oidc --user=oidc --cluster=nickname"
+    echo "      $ kubectl config use-context oidc"
+    echo
+}
+
+login() {
+    echo "[$(date)][INFO] Starting OIDC login with PKCE"
+    get_openid_config
+    gen_pkce
+    create_auth_uri
+    get_code
+    get_token
+    save_config
+}
+
+token() {
+    # returning id_token from cache"
+    if [ -r "$CACHE" ]; then
+        TOKEN=`cat ${CACHE}`
+        ID_TOKEN=`echo ${TOKEN} | jq .id_token -r`
+        local exp=$(exp_jwt $ID_TOKEN)
+        local timestamp=$(date -r $exp +%FT%TZ)
+        if [ $(date +%s) -ge $exp ]; then
+
+            # refreshing the token from server"
+            REFRESH_TOKEN=`echo ${TOKEN} | jq .refresh_token -r`
+            TOKEN=`curl -k -s $TOKEN_ENDPOINT \
+            -d grant_type=refresh_token \
+            -d refresh_token=${REFRESH_TOKEN} \
+            -d client_id=${OIDC_CLIENT_ID} \
+            -d client_secret=${OIDC_CLIENT_SECRET}`
+
+            ERROR=$(echo "$TOKEN" | jq .error -r)
+            if [ "$ERROR" != "null" ]; then
+                echo "[$(date)][INFO]  Your login session is likely to be expired." >&2
+                echo "[$(date)][INFO]  Open a terminal and run: kubectl oidc --login" >&2
+                exit 1
+            fi
+
+            # saving new token to cache"
+            echo ${TOKEN} > $CACHE
+            ID_TOKEN=`echo ${TOKEN} | jq .id_token -r`
+        fi
+        # return the id_token to kubectl
+        echo '{"apiVersion": "client.authentication.k8s.io/v1beta1", "kind": "ExecCredential", "status": {"token": "'${ID_TOKEN}'", "expirationTimestamp": "'${timestamp}'"}}'
+    else
+        echo "[$(date)][INFO]  Refresh the token." >&2
+        echo "[$(date)][INFO]  Open a terminal and run: kubectl oidc --login" >&2
+        exit 1
+    fi
+}
+
+main() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+            usage
+            exit 0
+            ;;
+
+            --login)
+            login
+            exit 0
+            ;;
+
+            --token)
+            token
+            exit 0
+            ;;
+
+            --setup)
+            check_prerequisites
+            login
+            setup
+            exit 0
+            ;;
+
+            *)
+            echo "[$(date)][ERROR] unespected option $1"
+            usage
+            exit 1
+            ;;
+        esac
+    done
+    usage
+    exit 1
+}
+
+main "$@"

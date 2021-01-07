@@ -1,0 +1,12 @@
+# .DS_Store
+*.DS_Store
+
+# .tls
+*.crt
+*.key
+*.pem
+*.cer
+*.cnf
+
+# .kubeconfig
+*.kubeconfig
