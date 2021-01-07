@@ -118,7 +118,7 @@ users:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
       args:
-      - oidc
+      - login
       - --token
       command: kubectl
       env: null
