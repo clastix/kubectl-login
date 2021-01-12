@@ -247,10 +247,8 @@ login() {
 
 load_config() {
     if [ -r "$CONFIG" ]; then
-        echo "[$(date)][INFO] loading configuration from $CONFIG"
         source "$CONFIG"
     else
-        echo "[$(date)][INFO] Setting up configuration"
         if [ "${API_SERVER}" = "" ];then
             read -p "Kubernetes APIs Server: " API_SERVER
         fi
@@ -313,6 +311,7 @@ main() {
             ;;
 
             --token)
+            load_config
             token
             exit 0
             ;;
