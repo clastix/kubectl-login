@@ -197,7 +197,7 @@ EOF
 }
 
 setup() {
-    echo "[$(date)][INFO] Configuring current kubeconfig"
+    echo "[$(date)][INFO] Creating kubeconfig"
 cat > oidc.kubeconfig <<EOF
 apiVersion: v1
 clusters:
@@ -225,8 +225,12 @@ users:
       env: null
 EOF
 
-    echo "kubeconfig file is:" oidc.kubeconfig
-    echo "export KUBECONFIG="oidc.kubeconfig
+    echo
+    echo "Make sure you can access the Kubernetes cluster:"
+    echo
+    echo "      $ export KUBECONFIG=oidc.kubeconfig"  
+    echo "      $ kubectl --user=oidc get pods"
+    echo 
 }
 
 login() {

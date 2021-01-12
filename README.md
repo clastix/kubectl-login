@@ -7,14 +7,14 @@ Based on the configured authentication mechanism, e.g. TLS client, OIDC, it will
 ## Features
 
 - [ ] Authenticate using TLS client certificates
-- [x] Authenticate using OIDC against different IdP
+- [x] Authenticate using OIDC
     - [x] Authorization Code Grant
     - [x] Authorization Code Grant with PKCE
     - [x] Authorization with Resource Owner Password
 - [ ] Authenticate against GKE
 - [ ] Authenticate against EKS
 - [ ] Authenticate against AKS
-- [x] Update current `kubeconfig`
+- [x] Create `kubeconfig`
 - [ ] Configure login parameters
 - [ ] Store historical login parameters
 
@@ -31,6 +31,7 @@ $ chmod u+x kubectl-login`
 Make sure to create a configuration file in your `~/.kube/oidc.conf` directory
 
 ```bash
+API_SERVER=https://cmp.clastix.io
 OIDC_SERVER=https://sso.clastix.io/auth/realms/caas
 OIDC_CLIENT_ID=kubectl
 PKCE=enabled
@@ -73,21 +74,12 @@ Enter verification code: **************
 [Thu Jan  7 13:05:11 CET 2021][INFO] Requesting token from https://sso.clastix.io/auth/realms/caas
 [Thu Jan  7 13:05:12 CET 2021][INFO] Saving token to cache
 [Thu Jan  7 13:05:12 CET 2021][INFO] Saving configuration to /Users/adriano/.kube/oidc.conf
-[Thu Jan  7 13:05:12 CET 2021][INFO] Configuring current kubeconfig
-User "oidc" set.
+[Thu Jan  7 13:05:12 CET 2021][INFO] Creating kubeconfig
 
 Make sure you can access the Kubernetes cluster:
 
+      $ export KUBECONFIG=oidc.kubeconfig
       $ kubectl --user=oidc get pods
-
-You can switch the current context:
-
-      $ kubectl config set-context --current --user=oidc
-
-Or you can set a new context:
-
-      $ kubectl config set-context oidc --user=oidc --cluster=nickname
-      $ kubectl config use-context oidc
 
 ```
 
