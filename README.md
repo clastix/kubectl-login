@@ -28,22 +28,10 @@ Copy the `kubectl-login` script somewhere on your `PATH`, and set it executable:
 $ chmod u+x kubectl-login`
 ```
 
-Make sure to create a configuration file in your `~/.kube/oidc.conf` directory
-
-```bash
-API_SERVER=https://cmp.clastix.io
-OIDC_SERVER=https://sso.clastix.io/auth/realms/caas
-OIDC_CLIENT_ID=kubectl
-PKCE=enabled
-CODE_CHALLENGE_METHOD=S256
-REDIRECT_URI=urn:ietf:wg:oauth:2.0:oob
-```
-
-
 ## Usage
 Once you have installed `kubectl-login` you can see a list of the commands available by running:
 
-```bash
+```
 $ kubectl login -h
 Usage: /usr/local/bin/kubectl-login [OPTIONS]
 
@@ -57,49 +45,50 @@ Usage: /usr/local/bin/kubectl-login [OPTIONS]
 
 Create an initial setup:
 
-```bash
+```
 $ kubectl login --setup
-[Thu Jan  7 13:04:55 CET 2021][INFO] Checking if prerequisites are installed
-[Thu Jan  7 13:04:55 CET 2021][INFO] Starting OIDC login with PKCE
-[Thu Jan  7 13:04:55 CET 2021][INFO] Getting OIDC configuration from https://sso.clastix.io/auth/realms/caas
-[Thu Jan  7 13:05:01 CET 2021][INFO] Generating PKCE Code Verifier and Challenge
-[Thu Jan  7 13:05:02 CET 2021][INFO] Creating authorization URI
+[Tue Jan 12 18:26:21 CET 2021][INFO] Checking if prerequisites are installed
+[Tue Jan 12 18:26:21 CET 2021][INFO] Starting OIDC login with PKCE
+[Tue Jan 12 18:26:21 CET 2021][INFO] Setting up configuration
+Kubernetes APIs Server: https://cmp.clastix.io
+OIDC Server URL: https://sso.clastix.io/auth/realms/caas
+OIDC Client ID: kubectl
+[Tue Jan 12 18:26:50 CET 2021][INFO] Getting OIDC configuration from https://sso.clastix.io/auth/realms/caas
+[Tue Jan 12 18:26:50 CET 2021][INFO] Generating PKCE Code Verifier and Challenge
+[Tue Jan 12 18:26:50 CET 2021][INFO] Creating authorization URI
 
 Go to the following link in your browser:
 
-https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/auth?querystring
+https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/auth?response_type=code&client_id=kubectl&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=openid+groups+offline_access&state=LnA6VFW3L0NmnrxDUNg52gKwbM3yI5MnDtWxKtPV4&prompt=consent&code_challenge=1icW0jFFHTcOU5QBZO_nGKiFdeg8Uo5nuel3MbCdoSo&code_challenge_method=S256&access_type=offline
 
 Enter verification code: **************
 
-[Thu Jan  7 13:05:11 CET 2021][INFO] Requesting token from https://sso.clastix.io/auth/realms/caas
-[Thu Jan  7 13:05:12 CET 2021][INFO] Saving token to cache
-[Thu Jan  7 13:05:12 CET 2021][INFO] Saving configuration to /Users/adriano/.kube/oidc.conf
-[Thu Jan  7 13:05:12 CET 2021][INFO] Creating kubeconfig
+[Tue Jan 12 18:27:07 CET 2021][INFO] Requesting token from https://sso.clastix.io/auth/realms/caas
+[Tue Jan 12 18:27:07 CET 2021][INFO] Saving token to cache
+[Tue Jan 12 18:27:07 CET 2021][INFO] Saving configuration to ~/.kube/oidc.conf
+[Tue Jan 12 18:27:07 CET 2021][INFO] Creating kubeconfig
 
 Make sure you can access the Kubernetes cluster:
 
       $ export KUBECONFIG=oidc.kubeconfig
       $ kubectl --user=oidc get pods
-
 ```
 
-And use it:
+The initial setup creates and stores configurations in the file `~/.kube/oidc.conf`
 
 ```bash
-$ kubectl --user=oidc get pods -n oil-production
-NAME                       READY   STATUS    RESTARTS   AGE
-example-5b64df8865-96f2p   1/1     Running   0          13h
-example-5b64df8865-fg9mv   1/1     Running   0          13h
-example-5b64df8865-z6ts9   1/1     Running   0          13h
+API_SERVER=https://cmp.clastix.io
+OIDC_SERVER=https://sso.clastix.io/auth/realms/caas
+OIDC_CLIENT_ID=kubectl
+CODE_CHALLENGE_METHOD=S256
+AUTH_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/auth
+TOKEN_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/token
+INTROSPECTION_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/token/introspect
+USERINFO_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/userinfo
+END_SESSION_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/logout
 ```
 
-You can start the login process any time by simply running:
-
-```bash
-$ kubectl login --login
-```
-
-Check your current `kubeconfig` file
+A `kubeconfig` file is created as:
 
 ```yaml
 kind: Config
@@ -116,6 +105,25 @@ users:
       env: null
 ...
 ```
+
+To use it, export or copy in your default location
+
+```
+$ export KUBECONFIG=oidc.kubeconfig
+$ kubectl --user=oidc get pods -n oil-production
+NAME                       READY   STATUS    RESTARTS   AGE
+example-5b64df8865-96f2p   1/1     Running   0          13h
+example-5b64df8865-fg9mv   1/1     Running   0          13h
+example-5b64df8865-z6ts9   1/1     Running   0          13h
+```
+
+You can start the login process any time by simply running:
+
+```
+$ kubectl login --login
+```
+
+
 
 ## Contributions
 `kubectl-login` is released with Apache2 open source license. Contributions are very welcome!

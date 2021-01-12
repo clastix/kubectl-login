@@ -78,9 +78,7 @@ cat > $CONFIG <<EOF
 API_SERVER=${API_SERVER}
 OIDC_SERVER=${OIDC_SERVER}
 OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
-PKCE=${PKCE}
 CODE_CHALLENGE_METHOD=${CODE_CHALLENGE_METHOD}
-REDIRECT_URI=${REDIRECT_URI}
 AUTH_ENDPOINT=${AUTH_ENDPOINT}
 TOKEN_ENDPOINT=${TOKEN_ENDPOINT}
 INTROSPECTION_ENDPOINT=${INTROSPECTION_ENDPOINT}
@@ -95,6 +93,8 @@ EOF
 #CLAIMS=${CLAIMS}
 #SCOPES=${SCOPES}
 #CODE_CHALLENGE_METHODS=${CODE_CHALLENGE_METHODS}
+#REDIRECT_URI=${REDIRECT_URI}
+#PKCE=${PKCE}
 
 }
 
@@ -110,10 +110,12 @@ gen_pkce() {
 create_auth_uri() {
     echo "[$(date)][INFO] Creating authorization URI"
     STATE=`openssl rand -base64 32 | tr -dc A-Za-z0-9`
+    REDIRECT_URI="urn:ietf:wg:oauth:2.0:oob"
     RESPONSE_TYPE="code"
     SCOPE="openid+groups+offline_access"
     PROMPT="consent"
     ACCESS_TYPE="offline"
+    CODE_CHALLENGE_METHOD="S256"
     
     QUERY="?"
     QUERY=$QUERY"response_type="$RESPONSE_TYPE"&"
@@ -126,7 +128,6 @@ create_auth_uri() {
     QUERY=$QUERY"code_challenge_method="$CODE_CHALLENGE_METHOD"&"
     QUERY=$QUERY"access_type="$ACCESS_TYPE
 
-    #QUERY="response_type=code&client_id="${OIDC_CLIENT_ID}"&redirect_uri="${REDIRECT_URI}"&scope=openid+groups+offline_access&state="${STATE}"&code_challenge="${CODE_CHALLENGE}"&prompt=consent&code_challenge_method="${CODE_CHALLENGE_METHOD}"&access_type=offline"
     AUTH_URI=${AUTH_ENDPOINT}${QUERY}
     echo
     echo "Go to the following link in your browser:"
@@ -191,12 +192,12 @@ Usage: $0 [OPTIONS]
     --help     display usage
     --login    login to the OIDC Server
     --token    return a valid id_token 
-    --setup    configure current kubeconfig 
- 
+    --setup    configure current kubeconfig
+
 EOF
 }
 
-setup() {
+create_kubeconfig() {
     echo "[$(date)][INFO] Creating kubeconfig"
 cat > oidc.kubeconfig <<EOF
 apiVersion: v1
@@ -235,12 +236,31 @@ EOF
 
 login() {
     echo "[$(date)][INFO] Starting OIDC login with PKCE"
+    load_config
     get_openid_config
     gen_pkce
     create_auth_uri
     get_code
     get_token
     save_config
+}
+
+load_config() {
+    if [ -r "$CONFIG" ]; then
+        echo "[$(date)][INFO] loading configuration from $CONFIG"
+        source "$CONFIG"
+    else
+        echo "[$(date)][INFO] Setting up configuration"
+        if [ "${API_SERVER}" = "" ];then
+            read -p "Kubernetes APIs Server: " API_SERVER
+        fi
+        if [ "${OIDC_SERVER}" = "" ];then
+            read -p "OIDC Server URL: " OIDC_SERVER
+        fi
+        if [ "${OIDC_CLIENT_ID}" = "" ];then
+            read -p "OIDC Client ID: " OIDC_CLIENT_ID
+        fi
+    fi
 }
 
 token() {
@@ -300,7 +320,7 @@ main() {
             --setup)
             check_prerequisites
             login
-            setup
+            create_kubeconfig
             exit 0
             ;;
 
@@ -321,10 +341,4 @@ PATH=$PATH:$BIN_DIR
 CONFIG=~/.kube/oidc.conf
 CACHE=~/.kube/oidc.cache
 
-if [ -r "$CONFIG" ]; then
-    source "$CONFIG"
-    main "$@"
-else
-    echo "[$(date)][ERROR]  Missing configuration." >&2
-    exit 1
-fi
+main "$@"
