@@ -75,6 +75,7 @@ get_openid_config() {
 save_config() {
     echo "[$(date)][INFO] Saving configuration to $CONFIG"
 cat > $CONFIG <<EOF
+API_SERVER=${API_SERVER}
 OIDC_SERVER=${OIDC_SERVER}
 OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
 PKCE=${PKCE}
@@ -197,26 +198,35 @@ EOF
 
 setup() {
     echo "[$(date)][INFO] Configuring current kubeconfig"
+cat > oidc.kubeconfig <<EOF
+apiVersion: v1
+clusters:
+- cluster:
+    insecure-skip-tls-verify: true
+    server: ${API_SERVER}
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: oidc
+  name: oidc
+current-context: oidc
+kind: Config
+preferences: {}
+users:
+- name: oidc
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - login
+      - --token
+      command: kubectl
+      env: null
+EOF
 
-    kubectl config set-credentials oidc \
-            --exec-api-version=client.authentication.k8s.io/v1beta1 \
-            --exec-command=kubectl \
-            --exec-arg=login,--token
-
-    echo
-    echo "Make sure you can access the Kubernetes cluster:"
-    echo
-    echo "      $ kubectl --user=oidc get pods"
-    echo
-    echo "You can switch the current context:"
-    echo
-    echo "      $ kubectl config set-context --current --user=oidc"
-    echo
-    echo "Or you can set a new context:"
-    echo
-    echo "      $ kubectl config set-context oidc --user=oidc --cluster=nickname"
-    echo "      $ kubectl config use-context oidc"
-    echo
+    echo "kubeconfig file is:" oidc.kubeconfig
+    echo "export KUBECONFIG="oidc.kubeconfig
 }
 
 login() {
