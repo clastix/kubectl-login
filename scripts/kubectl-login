@@ -102,7 +102,7 @@ gen_pkce() {
     echo "[$(date)][INFO] Generating PKCE Code Verifier and Challenge"
     # Length of code_verifier should be no less than 43 characters and no more than 128 characters,
     # and Base64URL encoded
-    CODE_VERIFIER=`openssl rand -base64 50 | tr -dc A-Za-z0-9` 
+    CODE_VERIFIER=`openssl rand -base64 50 | tr -dc A-Za-z0-9`
     # challenge = base64url(sha256(code_verifier))
     CODE_CHALLENGE=`echo -n ${CODE_VERIFIER} | sha256sum | cut -d " " -f 1 | xxd -r -p | base64 | tr / _ | tr + - | tr -d =`
 }
@@ -148,7 +148,7 @@ get_token() {
     # We should set a configuration option to distinguish if
     # the OIDC_CLIENT_SECRET is necessary (confidential client) or not (public client)
     # -d client_secret=$OIDC_CLIENT_SECRET
-    
+
     TOKEN=`curl -k -s $TOKEN_ENDPOINT \
     -d grant_type=authorization_code \
     -d response_type=id_token \
