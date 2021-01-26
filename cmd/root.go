@@ -169,12 +169,10 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 						Server:                viper.GetString(K8SAPIServer),
 						InsecureSkipTLSVerify: viper.GetBool(K8SSkipTlsVerify),
 						CertificateAuthorityData: func() (b []byte) {
-							var e error
-							b, e = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
-							if e != nil {
-								logger.Warn("Cannot read Kubernetes CA from file", zap.Error(e))
+							if viper.GetBool(K8SSkipTlsVerify) {
 								return nil
 							}
+							b, err = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
 							return
 						}(),
 					},
@@ -201,6 +199,9 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 					},
 				},
 			},
+		}
+		if err != nil {
+			return fmt.Errorf("Cannot read Kubernetes CA from file: %w", err)
 		}
 
 		scheme := runtime.NewScheme()
