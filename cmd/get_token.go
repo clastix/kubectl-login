@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/client-go/pkg/apis/clientauthentication"
+	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 
 	"github.com/clastix/kubectl-login/internal/actions"
 )
@@ -67,20 +67,18 @@ var tokenCmd = &cobra.Command{
 				}
 			}()
 		}
-		ec := &clientauthentication.ExecCredential{
+		ec := &clientauthenticationv1beta1.ExecCredential{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ExecCredential",
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 			},
-			Status: &clientauthentication.ExecCredentialStatus{
+			Status: &clientauthenticationv1beta1.ExecCredentialStatus{
 				Token: viper.GetString(TokenID),
 			},
 		}
 
 		scheme := runtime.NewScheme()
-		encoder := json.NewSerializerWithOptions(json.SimpleMetaFactory{}, scheme, scheme, json.SerializerOptions{
-			Strict: true,
-		})
+		encoder := json.NewSerializerWithOptions(json.SimpleMetaFactory{}, scheme, scheme, json.SerializerOptions{})
 		a := bytes.NewBuffer([]byte{})
 		if err = encoder.Encode(ec, a); err != nil {
 			return fmt.Errorf("cannot encode kubeconfig to JSON (%w)", err)

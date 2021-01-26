@@ -172,7 +172,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 							var e error
 							b, e = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
 							if e != nil {
-								logger.Warn("Cannot read Kubernetes CA from file", zap.Error(err))
+								logger.Warn("Cannot read Kubernetes CA from file", zap.Error(e))
 								return nil
 							}
 							return
