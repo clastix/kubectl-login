@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -26,6 +25,8 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+
+	"github.com/clastix/kubectl-login/internal/oidc"
 )
 
 type tokenResponse struct {
@@ -36,16 +37,18 @@ type tokenResponse struct {
 
 type GetToken struct {
 	logger *zap.Logger
+	client *oidc.HttpClient
 	tokenEndpoint, OIDClientID, code, pkceCodeVerifier string
 }
 
-func NewGetToken(logger *zap.Logger, tokenEndpoint, OIDClientID, code, pkceCodeVerifier string) *GetToken {
+func NewGetToken(logger *zap.Logger, tokenEndpoint, OIDClientID, code, pkceCodeVerifier string, httpClient *oidc.HttpClient) *GetToken {
 	return &GetToken{
 		logger: logger,
 		tokenEndpoint: tokenEndpoint,
 		OIDClientID: OIDClientID,
 		code: code,
 		pkceCodeVerifier: pkceCodeVerifier,
+		client: httpClient,
 	}
 }
 
@@ -65,14 +68,8 @@ func (r GetToken) Handle() (idToken, refreshToken string, err error) {
 		return
 	}
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := &http.Client{Transport: tr}
-
 	var res *http.Response
-	if res, err = client.Post(tokenUrl.String(), "application/x-www-form-urlencoded", strings.NewReader(d.Encode())); err != nil {
+	if res, err = r.client.Post(tokenUrl.String(), "application/x-www-form-urlencoded", strings.NewReader(d.Encode())); err != nil {
 		r.logger.Error("Cannot reach the server", zap.Error(err), zap.String("uri", tokenUrl.String()))
 		return
 	}

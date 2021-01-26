@@ -17,7 +17,6 @@ limitations under the License.
 package actions
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +24,8 @@ import (
 	"net/http"
 
 	"go.uber.org/zap"
+
+	"github.com/clastix/kubectl-login/internal/oidc"
 )
 
 const (
@@ -43,24 +44,18 @@ type OIDCResponse struct {
 	ClaimsSupported               []string `json:"claims_supported"`
 	ScopesSupported               []string `json:"scopes_supported"`
 	CodeChallengeMethodsSupported []string `json:"code_challenge_methods_supported"`
-	Error					      string   `json:"error"`
+	Error                         string   `json:"error"`
 }
 
 type PKCELogin struct {
 	logger *zap.Logger
-	client *http.Client
+	client *oidc.HttpClient
 }
 
-func NewOIDCConfiguration(logger *zap.Logger, insecureSkipVerify bool) *PKCELogin {
+func NewOIDCConfiguration(logger *zap.Logger, oidcClient *oidc.HttpClient) *PKCELogin {
 	return &PKCELogin{
 		logger: logger,
-		client: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: insecureSkipVerify,
-				},
-			},
-		},
+		client: oidcClient,
 	}
 }
 

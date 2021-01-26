@@ -29,16 +29,16 @@ import (
 )
 
 type RefreshToken struct {
-	logger                                     *zap.Logger
-	client                                     *http.Client
-	refreshEndpoint, OIDClientID, refreshToken string
+	logger                                      *zap.Logger
+	client                                      *http.Client
+	refreshEndpoint, oidcClientID, refreshToken string
 }
 
-func NewRefreshToken(logger *zap.Logger, insecureSkipVerify bool, refreshEndpoint string, OIDClientID string, refreshToken string) *RefreshToken {
+func NewRefreshToken(logger *zap.Logger, insecureSkipVerify bool, refreshEndpoint string, oidcClientID string, refreshToken string) *RefreshToken {
 	return &RefreshToken{
 		logger:          logger,
+		oidcClientID:    oidcClientID,
 		refreshEndpoint: refreshEndpoint,
-		OIDClientID:     OIDClientID,
 		refreshToken:    refreshToken,
 		client: &http.Client{
 			Transport: &http.Transport{
@@ -54,7 +54,7 @@ func (r RefreshToken) Handle() (idToken, refresh string, err error) {
 	d := url.Values{}
 	d.Add("grant_type", "refresh_token")
 	d.Add("refresh_token", r.refreshToken)
-	d.Add("client_id", r.OIDClientID)
+	d.Add("client_id", r.oidcClientID)
 
 	var tokenUrl *url.URL
 	tokenUrl, err = url.Parse(r.refreshEndpoint)

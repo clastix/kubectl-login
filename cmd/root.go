@@ -13,18 +13,29 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 
+	"github.com/manifoldco/promptui"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+
+	"github.com/clastix/kubectl-login/internal/actions"
+	"github.com/clastix/kubectl-login/internal/oidc"
 )
 
 var cfgFile string
@@ -37,37 +48,191 @@ environments, including local setups and cloud providers, i.e. EKS, AKS, GKE.
 
 Based on the configured authentication mechanism (e.g. TLS client, OIDC), it will login users in the Kubernetes clusters
 they are allowed to access and generate a kubeconfig for a chosen cluster.`,
+	SilenceUsage:  true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
-		// Defining the logging options
-		logger, err = zap.NewDevelopment()
-		if ok, _ := cmd.PersistentFlags().GetBool("verbose"); ok {
+		if ok, _ := cmd.Flags().GetBool("verbose"); ok {
 			logger, err = zap.NewDevelopment()
+			if err != nil {
+				return
+			}
 		}
+
+		if v, _ := cmd.Flags().GetString(flagsMap[OIDCServer]); len(v) > 0 {
+			viper.Set(OIDCServer, v)
+		}
+		if v, _ := cmd.Flags().GetString(flagsMap[OIDCClientID]); len(v) > 0 {
+			viper.Set(OIDCClientID, v)
+		}
+		if v, _ := cmd.Flags().GetBool(flagsMap[OIDCSkipTlsVerify]); true {
+			viper.Set(OIDCSkipTlsVerify, v)
+		}
+		if v, _ := cmd.Flags().GetString(flagsMap[OIDCCertificateAuthority]); len(v) > 0 {
+			viper.Set(OIDCCertificateAuthority, v)
+		}
+
+		if v, _ := cmd.Flags().GetString(flagsMap[K8SAPIServer]); len(v) > 0 {
+			viper.Set(K8SAPIServer, v)
+		}
+		if v, _ := cmd.Flags().GetBool(flagsMap[K8SCertificateAuthorityPath]); true {
+			viper.Set(K8SSkipTlsVerify, v)
+		}
+		if v, _ := cmd.Flags().GetString(flagsMap[K8SCertificateAuthorityPath]); len(v) > 0 {
+			viper.Set(K8SCertificateAuthorityPath, v)
+		}
+		if v, _ := cmd.Flags().GetString(flagsMap[KubeconfigPath]); len(v) > 0 {
+			viper.Set(KubeconfigPath, v)
+		}
+
+		if v := viper.GetString(OIDCServer); len(v) == 0 {
+			return errors.New("Missing OIDC server endpoint")
+		}
+		if v := viper.GetString(OIDCClientID); len(v) == 0 {
+			return errors.New("Missing OIDC server endpoint")
+		}
+		if v := viper.GetString(K8SAPIServer); len(v) == 0 {
+			return errors.New("Missing Kubernetes API server")
+		}
+		if v := viper.GetString(KubeconfigPath); len(v) == 0 {
+			return errors.New("Missing path to the resulting kubeconfig")
+		}
+
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
+		logger.Info("Starting the login procedure")
+
+		// Creating OIDC server HTTP client with TLS handling
+		var client *oidc.HttpClient
+		client, err = oidc.NewHTTPClient(viper.GetString(OIDCCertificateAuthority), viper.GetBool(OIDCSkipTlsVerify))
 		if err != nil {
 			return
 		}
 
-		if apiServer, _ := cmd.Flags().GetString("api-server"); len(apiServer) != 0 {
-			viper.Set(ApiServer, apiServer)
-		}
-		if oidcServer, _ := cmd.Flags().GetString("oidc-server"); len(oidcServer) != 0 {
-			viper.Set(OIDCServer, oidcServer)
-		}
-		if oidcClientID, _ := cmd.Flags().GetString("oidc-client-id"); len(oidcClientID) != 0 {
-			viper.Set(OIDCClientID, oidcClientID)
+		// Gathering the OIDC server configuration
+		var res *actions.OIDCResponse
+		if res, err = actions.NewOIDCConfiguration(logger, client).Handle(viper.GetString(OIDCServer)); err != nil {
+			return err
 		}
 
-		if len(viper.GetString(ApiServer)) == 0 {
-			err = fmt.Errorf("missing api-server flag value")
-		}
-		if len(viper.GetString(OIDCServer)) == 0 {
-			err = fmt.Errorf("missing oidc-server-url flag value")
-		}
-		if len(viper.GetString(OIDCClientID)) == 0 {
-			err = fmt.Errorf("missing oidc-client-id flag value")
+		pkce := actions.NewCodeVerifier(logger).Handle()
+
+		var url string
+		url, err = actions.NewAuthenticationURI(logger, viper.GetString(OIDCClientID), pkce, res).Handle()
+		if err != nil {
+			return err
 		}
 
-		return
+		fmt.Println("")
+		fmt.Println("Proceed to login to the following link using your browser:")
+		fmt.Println("")
+		fmt.Println(url)
+		fmt.Println("")
+
+		prompt := promptui.Prompt{
+			Label: "Enter verification code",
+			Validate: func(s string) (err error) {
+				if len(s) == 0 {
+					err = fmt.Errorf("an empty string is not a valid code")
+				}
+				return
+			},
+		}
+		var code string
+		if code, err = prompt.Run(); err != nil {
+			return err
+		}
+
+		var token, refresh string
+		token, refresh, err = actions.NewGetToken(logger, res.TokenEndpoint, viper.GetString(OIDCClientID), code, pkce, client).Handle()
+		if err != nil {
+			return fmt.Errorf("Cannot proceed to login due to an error: %w", err)
+		}
+
+		viper.Set(TokenEndpoint, res.TokenEndpoint)
+		viper.Set(TokenID, token)
+		viper.Set(TokenRefresh, refresh)
+
+		defer func() {
+			if err = viper.WriteConfig(); err != nil {
+				logger.Error("Cannot write configuration file", zap.Error(err))
+			}
+		}()
+
+		config := &v1.Config{
+			Kind:           "Config",
+			APIVersion:     "v1",
+			CurrentContext: "oidc",
+			Clusters: []v1.NamedCluster{
+				{
+					Name: "kubernetes",
+					Cluster: v1.Cluster{
+						Server:                viper.GetString(K8SAPIServer),
+						InsecureSkipTLSVerify: viper.GetBool(K8SSkipTlsVerify),
+						CertificateAuthorityData: func() (b []byte) {
+							var e error
+							b, e = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
+							if e != nil {
+								logger.Warn("Cannot read Kubernetes CA from file", zap.Error(err))
+								return nil
+							}
+							return
+						}(),
+					},
+				},
+			},
+			Contexts: []v1.NamedContext{
+				{
+					Name: "oidc",
+					Context: v1.Context{
+						Cluster:  "kubernetes",
+						AuthInfo: "oidc",
+					},
+				},
+			},
+			AuthInfos: []v1.NamedAuthInfo{
+				{
+					Name: "oidc",
+					AuthInfo: v1.AuthInfo{
+						Exec: &v1.ExecConfig{
+							Command:    "kubectl",
+							Args:       []string{"login", tokenCmd.Use},
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+						},
+					},
+				},
+			},
+		}
+
+		scheme := runtime.NewScheme()
+		e := json.NewSerializerWithOptions(yaml.SimpleMetaFactory{}, scheme, scheme, json.SerializerOptions{
+			Yaml:   true,
+			Pretty: true,
+			Strict: false,
+		})
+
+		a := bytes.NewBuffer([]byte{})
+		if err = e.Encode(config, a); err != nil {
+			return fmt.Errorf("cannot encode kubeconfig to YAML (%w)", err)
+		}
+
+		path, _ := cmd.Flags().GetString("kubeconfig-path")
+
+		if err = afero.WriteFile(afero.NewOsFs(), path, a.Bytes(), os.ModePerm); err != nil {
+			msg := "cannot save generated kubeconfig"
+			logger.Error(msg, zap.Error(err))
+			return errors.New(msg)
+		}
+
+		fmt.Println("")
+		fmt.Println("Your login procedure has been completed!")
+		fmt.Println("")
+		fmt.Println("You can start interacting with your Kuberneter cluster using the generated kubeconfig file:")
+		fmt.Printf("export KUBECONFIG=%s", path)
+		fmt.Println("")
+		fmt.Println("")
+		fmt.Println("Happy Kubernetes interaction!")
+
+		return nil
 	},
 }
 
@@ -83,17 +248,18 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kubectl-login.yaml)")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Toggle the verbose logging")
-
-	// oidc-insecure-skip-tls-verify
-	// oidc-server-ca-path
-
-	rootCmd.PersistentFlags().String("api-server", "", "The Kubernetes API server to connect to")
-	// k8s-insecure-skip-tls-verify
-	// k8s-ca-path
-
-	rootCmd.PersistentFlags().String("oidc-server", "", "The OIDC server URL to connect to")
-	rootCmd.PersistentFlags().String("oidc-client-id", "", "The OIDC client ID provided")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	rootCmd.PersistentFlags().String(flagsMap[OIDCServer], "", "The OIDC server URL to connect to")
+	rootCmd.PersistentFlags().String(flagsMap[OIDCClientID], "", "The OIDC client ID provided")
+	rootCmd.PersistentFlags().Bool(flagsMap[OIDCSkipTlsVerify], false, "Disable TLS certificate verification for the OIDC server")
+	rootCmd.PersistentFlags().String(flagsMap[OIDCCertificateAuthority], "", "Path to the OIDC server certificate authority PEM encoded file")
+
+	rootCmd.PersistentFlags().String(flagsMap[K8SAPIServer], "", "Endpoint of the Kubernetes API server to connect to")
+	rootCmd.PersistentFlags().Bool(flagsMap[K8SSkipTlsVerify], false, "Disable TLS certificate verification for the Kubernetes API server")
+	rootCmd.PersistentFlags().String(flagsMap[K8SCertificateAuthorityPath], "", "Path to the Kubernetes API server certificate authority PEM encoded file")
+
+	rootCmd.PersistentFlags().String(flagsMap[KubeconfigPath], "oidc.kubeconfig", "Path to the generated kubeconfig file upon resulting login procedure to access the Kubernetes cluster")
 }
 
 // initConfig reads in config file and ENV variables if set.

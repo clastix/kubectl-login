@@ -17,12 +17,12 @@ limitations under the License.
 package actions
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"regexp"
+	"math/rand"
 
 	"go.uber.org/zap"
 )
+
+const dictBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890"
 
 type CodeVerifier struct {
 	logger *zap.Logger
@@ -32,18 +32,15 @@ func NewCodeVerifier(logger *zap.Logger) *CodeVerifier {
 	return &CodeVerifier{logger: logger}
 }
 
-// Length of code_verifier should be no less than 43 characters and no more than 128 characters, and Base64URL encoded.
-func (r CodeVerifier) Handle() (out string, err error) {
-	r.logger.Info("Generating PKCE Code Verifier and Challenge")
+func (r CodeVerifier) Handle() (out string) {
+	b := make([]byte, 128)
 
-	b := make([]byte, 50)
-	if _, err = rand.Read(b); err != nil {
-		r.logger.Error("Cannot read random generate data", zap.Error(err))
-		return
+	r.logger.Info("Generating PKCE Code Verifier and Challenge")
+	defer func() { r.logger.Info("PKCE code verifier generated", zap.ByteString("code", b)) }()
+
+	for i := range b {
+		b[i] = dictBytes[rand.Intn(len(dictBytes))]
 	}
 
-	a := base64.URLEncoding.EncodeToString(b)
-	regex := regexp.MustCompile(`[^a-zA-Z0-9]`)
-
-	return regex.ReplaceAllString(a, ""), nil
+	return string(b)
 }

@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
@@ -22,22 +23,21 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	json2 "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 
-	"github.com/clastix/kubectl-login/actions"
+	"github.com/clastix/kubectl-login/internal/actions"
 )
 
 var tokenCmd = &cobra.Command{
-	Use:           "token",
-	Short:         "Return a valid id_token to kubectl",
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	Use:   "get-token",
+	Short: "Return a credential execution required by kubectl with the updated ID token",
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		var idToken string
-		if idToken = viper.GetString(IDToken); len(idToken) == 0 {
+		if idToken = viper.GetString(TokenID); len(idToken) == 0 {
 			return fmt.Errorf("the ID Token is not yet configured, please issue the login process first")
 		}
 
@@ -50,16 +50,22 @@ var tokenCmd = &cobra.Command{
 
 		if err = claims.Valid(); err != nil {
 			logger.Info("proceeding to token refresh")
+			logger.Debug("JWT claim is not valid due to error", zap.Error(err))
 
-			var idToken, refreshToken string
-			idToken, refreshToken, err = actions.NewRefreshToken(logger, true, viper.GetString(TokenEndpoint), viper.GetString(OIDCClientID), viper.GetString(RefreshToken)).Handle()
+			var refreshToken string
+			idToken, refreshToken, err = actions.NewRefreshToken(logger, true, viper.GetString(TokenEndpoint), viper.GetString(OIDCClientID), viper.GetString(TokenRefresh)).Handle()
 			if err != nil {
 				return fmt.Errorf("cannot refresh token due to an error (%w)", err)
 			}
 
-			viper.Set(IDToken, idToken)
-			viper.Set(RefreshToken, refreshToken)
+			viper.Set(TokenID, idToken)
+			viper.Set(TokenRefresh, refreshToken)
 
+			defer func() {
+				if err = viper.WriteConfig(); err != nil {
+					logger.Error("Cannot write configuration file", zap.Error(err))
+				}
+			}()
 		}
 		ec := &clientauthentication.ExecCredential{
 			TypeMeta: metav1.TypeMeta{
@@ -67,12 +73,12 @@ var tokenCmd = &cobra.Command{
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 			},
 			Status: &clientauthentication.ExecCredentialStatus{
-				Token: viper.GetString(IDToken),
+				Token: viper.GetString(TokenID),
 			},
 		}
 
 		scheme := runtime.NewScheme()
-		encoder := json2.NewSerializerWithOptions(json2.SimpleMetaFactory{}, scheme, scheme, json2.SerializerOptions{
+		encoder := json.NewSerializerWithOptions(json.SimpleMetaFactory{}, scheme, scheme, json.SerializerOptions{
 			Strict: true,
 		})
 		a := bytes.NewBuffer([]byte{})
