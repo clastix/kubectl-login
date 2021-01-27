@@ -17,7 +17,8 @@ limitations under the License.
 package actions
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 
 	"go.uber.org/zap"
 )
@@ -39,7 +40,8 @@ func (r CodeVerifier) Handle() (out string) {
 	defer func() { r.logger.Info("PKCE code verifier generated", zap.ByteString("code", b)) }()
 
 	for i := range b {
-		b[i] = dictBytes[rand.Intn(len(dictBytes))]
+		bi, _ := rand.Int(rand.Reader, big.NewInt(int64(len(dictBytes))))
+		b[i] = dictBytes[bi.Int64()]
 	}
 
 	return string(b)

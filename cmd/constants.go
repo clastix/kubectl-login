@@ -20,12 +20,12 @@ const (
 	// Kubernetes viper keys
 	K8SAPIServer                = "kubernetes.endpoint"
 	KubeconfigPath              = "kubernetes.kubeconfig"
-	K8SSkipTlsVerify            = "kubernetes.ca.insecure"
+	K8SSkipTLSVerify            = "kubernetes.ca.insecure"
 	K8SCertificateAuthorityPath = "kubernetes.ca.path"
 	// OIDC viper keys
 	OIDCServer               = "oidc.server"
 	OIDCClientID             = "oidc.clientid"
-	OIDCSkipTlsVerify        = "oidc.ca.insecure"
+	OIDCSkipTLSVerify        = "oidc.ca.insecure"
 	OIDCCertificateAuthority = "oidc.ca.path"
 	// Token viper keys
 	TokenID       = "token.id"
@@ -38,11 +38,11 @@ var (
 		// OIDC flags
 		OIDCServer:               "oidc-server",
 		OIDCClientID:             "oidc-client-id",
-		OIDCSkipTlsVerify:        "oidc-insecure-skip-tls-verify",
+		OIDCSkipTLSVerify:        "oidc-insecure-skip-tls-verify",
 		OIDCCertificateAuthority: "oidc-server-ca-path",
 		// Kubernetes flags
 		K8SAPIServer:                "k8s-api-server",
-		K8SSkipTlsVerify:            "k8s-insecure-skip-tls-verify",
+		K8SSkipTLSVerify:            "k8s-insecure-skip-tls-verify",
 		K8SCertificateAuthorityPath: "k8s-server-ca-path",
 		KubeconfigPath:              "kubeconfig-path",
 	}

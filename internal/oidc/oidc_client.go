@@ -48,15 +48,16 @@ func NewOIDCCAPoolError() error {
 	return &CAPoolError{}
 }
 
-type HttpClient struct {
+type HTTPClient struct {
 	http.Client
 }
 
-func NewHTTPClient(certificateAuthorityPath string, insecureSkipVerify bool) (client *HttpClient, err error) {
-	return &HttpClient{
+func NewHTTPClient(certificateAuthorityPath string, insecureSkipVerify bool) (client *HTTPClient, err error) {
+	return &HTTPClient{
 		Client: http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
+					//nolint:gosec
 					InsecureSkipVerify: insecureSkipVerify,
 					RootCAs: func() (pool *x509.CertPool) {
 						if len(certificateAuthorityPath) == 0 {

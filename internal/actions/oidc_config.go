@@ -49,20 +49,20 @@ type OIDCResponse struct {
 
 type PKCELogin struct {
 	logger *zap.Logger
-	client *oidc.HttpClient
+	client *oidc.HTTPClient
 }
 
-func NewOIDCConfiguration(logger *zap.Logger, oidcClient *oidc.HttpClient) *PKCELogin {
+func NewOIDCConfiguration(logger *zap.Logger, oidcClient *oidc.HTTPClient) *PKCELogin {
 	return &PKCELogin{
 		logger: logger,
 		client: oidcClient,
 	}
 }
 
-func (r PKCELogin) Handle(OIDCServer string) (response *OIDCResponse, err error) {
+func (r PKCELogin) Handle(oidcServer string) (response *OIDCResponse, err error) {
 	r.logger.Info("Starting OIDC login with PKCE")
 
-	response, err = r.GetOpenIDConfig(OIDCServer)
+	response, err = r.GetOpenIDConfig(oidcServer)
 	if err != nil {
 		return
 	}
@@ -70,13 +70,13 @@ func (r PKCELogin) Handle(OIDCServer string) (response *OIDCResponse, err error)
 	return
 }
 
-func (r PKCELogin) GetOpenIDConfig(OIDCServer string) (out *OIDCResponse, err error) {
-	r.logger.Info("Getting OIDC configuration from the server", zap.String("OIDCServer", OIDCServer))
+func (r PKCELogin) GetOpenIDConfig(oidcServer string) (out *OIDCResponse, err error) {
+	r.logger.Info("Getting OIDC configuration from the server", zap.String("OIDCServer", oidcServer))
 
 	var res *http.Response
-	res, err = r.client.Get(fmt.Sprintf("%s/.well-known/openid-configuration", OIDCServer))
+	res, err = r.client.Get(fmt.Sprintf("%s/.well-known/openid-configuration", oidcServer))
 	if err != nil {
-		r.logger.Error("Cannot get OIDC configuration from the server", zap.String("OIDCServer", OIDCServer), zap.Error(err))
+		r.logger.Error("Cannot get OIDC configuration from the server", zap.String("OIDCServer", oidcServer), zap.Error(err))
 		return
 	}
 	defer func() { _ = res.Body.Close() }()
@@ -84,7 +84,7 @@ func (r PKCELogin) GetOpenIDConfig(OIDCServer string) (out *OIDCResponse, err er
 	out = &OIDCResponse{}
 	b, _ := ioutil.ReadAll(res.Body)
 	if err = json.Unmarshal(b, out); err != nil {
-		r.logger.Error("Cannot unmarshal OIDC configuration", zap.String("OIDCServer", OIDCServer), zap.Error(err))
+		r.logger.Error("Cannot unmarshal OIDC configuration", zap.String("OIDCServer", oidcServer), zap.Error(err))
 		return
 	}
 	if len(out.Error) > 0 {

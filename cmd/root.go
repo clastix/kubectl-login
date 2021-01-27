@@ -49,7 +49,7 @@ environments, including local setups and cloud providers, i.e. EKS, AKS, GKE.
 
 Based on the configured authentication mechanism (e.g. TLS client, OIDC), it will login users in the Kubernetes clusters
 they are allowed to access and generate a kubeconfig for a chosen cluster.`,
-	SilenceUsage:  true,
+	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		if ok, _ := cmd.Flags().GetBool("verbose"); ok {
 			logger, err = zap.NewDevelopment()
@@ -64,9 +64,9 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v, _ := cmd.Flags().GetString(flagsMap[OIDCClientID]); len(v) > 0 {
 			viper.Set(OIDCClientID, v)
 		}
-		if cmd.Flag(flagsMap[OIDCSkipTlsVerify]).Changed {
-			v, _ := cmd.Flags().GetBool(flagsMap[OIDCSkipTlsVerify])
-			viper.Set(OIDCSkipTlsVerify, v)
+		if cmd.Flag(flagsMap[OIDCSkipTLSVerify]).Changed {
+			v, _ := cmd.Flags().GetBool(flagsMap[OIDCSkipTLSVerify])
+			viper.Set(OIDCSkipTLSVerify, v)
 		}
 		if v, _ := cmd.Flags().GetString(flagsMap[OIDCCertificateAuthority]); len(v) > 0 {
 			viper.Set(OIDCCertificateAuthority, v)
@@ -75,9 +75,9 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v, _ := cmd.Flags().GetString(flagsMap[K8SAPIServer]); len(v) > 0 {
 			viper.Set(K8SAPIServer, v)
 		}
-		if cmd.Flag(flagsMap[K8SSkipTlsVerify]).Changed {
-			v, _ := cmd.Flags().GetBool(flagsMap[K8SSkipTlsVerify])
-			viper.Set(K8SSkipTlsVerify, v)
+		if cmd.Flag(flagsMap[K8SSkipTLSVerify]).Changed {
+			v, _ := cmd.Flags().GetBool(flagsMap[K8SSkipTLSVerify])
+			viper.Set(K8SSkipTLSVerify, v)
 		}
 		if v, _ := cmd.Flags().GetString(flagsMap[K8SCertificateAuthorityPath]); len(v) > 0 {
 			viper.Set(K8SCertificateAuthorityPath, v)
@@ -87,16 +87,16 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		}
 
 		if v := viper.GetString(OIDCServer); len(v) == 0 {
-			return errors.New("Missing OIDC server endpoint")
+			return errors.New("missing OIDC server endpoint")
 		}
 		if v := viper.GetString(OIDCClientID); len(v) == 0 {
-			return errors.New("Missing OIDC server endpoint")
+			return errors.New("missing OIDC server endpoint")
 		}
 		if v := viper.GetString(K8SAPIServer); len(v) == 0 {
-			return errors.New("Missing Kubernetes API server")
+			return errors.New("missing Kubernetes API server")
 		}
 		if v := viper.GetString(KubeconfigPath); len(v) == 0 {
-			return errors.New("Missing path to the resulting kubeconfig")
+			return errors.New("missing path to the resulting kubeconfig")
 		}
 
 		return nil
@@ -105,8 +105,8 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		logger.Info("Starting the login procedure")
 
 		// Creating OIDC server HTTP client with TLS handling
-		var client *oidc.HttpClient
-		client, err = oidc.NewHTTPClient(viper.GetString(OIDCCertificateAuthority), viper.GetBool(OIDCSkipTlsVerify))
+		var client *oidc.HTTPClient
+		client, err = oidc.NewHTTPClient(viper.GetString(OIDCCertificateAuthority), viper.GetBool(OIDCSkipTLSVerify))
 		if err != nil {
 			return
 		}
@@ -142,7 +142,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		var token, refresh string
 		token, refresh, err = actions.NewGetToken(logger, res.TokenEndpoint, viper.GetString(OIDCClientID), code, pkce, client).Handle()
 		if err != nil {
-			return fmt.Errorf("Cannot proceed to login due to an error: %w", err)
+			return fmt.Errorf("cannot proceed to login due to an error: %w", err)
 		}
 
 		viper.Set(TokenEndpoint, res.TokenEndpoint)
@@ -164,9 +164,9 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 					Name: "kubernetes",
 					Cluster: v1.Cluster{
 						Server:                viper.GetString(K8SAPIServer),
-						InsecureSkipTLSVerify: viper.GetBool(K8SSkipTlsVerify),
+						InsecureSkipTLSVerify: viper.GetBool(K8SSkipTLSVerify),
 						CertificateAuthorityData: func() (b []byte) {
-							if viper.GetBool(K8SSkipTlsVerify) {
+							if viper.GetBool(K8SSkipTLSVerify) {
 								return nil
 							}
 							b, err = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
@@ -198,7 +198,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 			},
 		}
 		if err != nil {
-			return fmt.Errorf("Cannot read Kubernetes CA from file: %w", err)
+			return fmt.Errorf("cannot read Kubernetes CA from file: %w", err)
 		}
 
 		scheme := runtime.NewScheme()
@@ -248,11 +248,11 @@ func init() {
 
 	rootCmd.PersistentFlags().String(flagsMap[OIDCServer], viper.GetString(OIDCServer), "The OIDC server URL to connect to")
 	rootCmd.PersistentFlags().String(flagsMap[OIDCClientID], viper.GetString(OIDCClientID), "The OIDC client ID provided")
-	rootCmd.PersistentFlags().Bool(flagsMap[OIDCSkipTlsVerify], viper.GetBool(OIDCSkipTlsVerify), "Disable TLS certificate verification for the OIDC server")
+	rootCmd.PersistentFlags().Bool(flagsMap[OIDCSkipTLSVerify], viper.GetBool(OIDCSkipTLSVerify), "Disable TLS certificate verification for the OIDC server")
 	rootCmd.PersistentFlags().String(flagsMap[OIDCCertificateAuthority], viper.GetString(OIDCCertificateAuthority), "Path to the OIDC server certificate authority PEM encoded file")
 
 	rootCmd.PersistentFlags().String(flagsMap[K8SAPIServer], viper.GetString(K8SAPIServer), "Endpoint of the Kubernetes API server to connect to")
-	rootCmd.PersistentFlags().Bool(flagsMap[K8SSkipTlsVerify], viper.GetBool(K8SSkipTlsVerify), "Disable TLS certificate verification for the Kubernetes API server")
+	rootCmd.PersistentFlags().Bool(flagsMap[K8SSkipTLSVerify], viper.GetBool(K8SSkipTLSVerify), "Disable TLS certificate verification for the Kubernetes API server")
 	rootCmd.PersistentFlags().String(flagsMap[K8SCertificateAuthorityPath], viper.GetString(K8SCertificateAuthorityPath), "Path to the Kubernetes API server certificate authority PEM encoded file")
 
 	rootCmd.PersistentFlags().String(flagsMap[KubeconfigPath], "oidc.kubeconfig", "Path to the generated kubeconfig file upon resulting login procedure to access the Kubernetes cluster")

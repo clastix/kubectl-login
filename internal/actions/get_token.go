@@ -30,25 +30,25 @@ import (
 )
 
 type tokenResponse struct {
-	IDToken          string `json:"id_token"`
-	RefreshToken     string `json:"refresh_token"`
-	Error            string `json:"error"`
+	IDToken      string `json:"id_token"`
+	RefreshToken string `json:"refresh_token"`
+	Error        string `json:"error"`
 }
 
 type GetToken struct {
-	logger *zap.Logger
-	client *oidc.HttpClient
+	logger                                             *zap.Logger
+	client                                             *oidc.HTTPClient
 	tokenEndpoint, OIDClientID, code, pkceCodeVerifier string
 }
 
-func NewGetToken(logger *zap.Logger, tokenEndpoint, OIDClientID, code, pkceCodeVerifier string, httpClient *oidc.HttpClient) *GetToken {
+func NewGetToken(logger *zap.Logger, tokenEndpoint, oidcClientID, code, pkceCodeVerifier string, httpClient *oidc.HTTPClient) *GetToken {
 	return &GetToken{
-		logger: logger,
-		tokenEndpoint: tokenEndpoint,
-		OIDClientID: OIDClientID,
-		code: code,
+		logger:           logger,
+		tokenEndpoint:    tokenEndpoint,
+		OIDClientID:      oidcClientID,
+		code:             code,
 		pkceCodeVerifier: pkceCodeVerifier,
-		client: httpClient,
+		client:           httpClient,
 	}
 }
 
@@ -61,16 +61,16 @@ func (r GetToken) Handle() (idToken, refreshToken string, err error) {
 	d.Add("code_verifier", r.pkceCodeVerifier)
 	d.Add("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
 
-	var tokenUrl *url.URL
-	tokenUrl, err = url.Parse(r.tokenEndpoint)
+	var tokenURL *url.URL
+	tokenURL, err = url.Parse(r.tokenEndpoint)
 	if err != nil {
 		r.logger.Error("Cannot retrieve OIDC token due to non well-formed endpoint", zap.Error(err), zap.String("tokenEndpoint", r.tokenEndpoint))
 		return
 	}
 
 	var res *http.Response
-	if res, err = r.client.Post(tokenUrl.String(), "application/x-www-form-urlencoded", strings.NewReader(d.Encode())); err != nil {
-		r.logger.Error("Cannot reach the server", zap.Error(err), zap.String("uri", tokenUrl.String()))
+	if res, err = r.client.Post(tokenURL.String(), "application/x-www-form-urlencoded", strings.NewReader(d.Encode())); err != nil {
+		r.logger.Error("Cannot reach the server", zap.Error(err), zap.String("uri", tokenURL.String()))
 		return
 	}
 	defer func() { _ = res.Body.Close() }()

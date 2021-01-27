@@ -29,14 +29,13 @@ import (
 type AuthenticationURI struct {
 	logger                                   *zap.Logger
 	authEndpoint, oidcClientID, codeVerifier string
-
 }
 
-func NewAuthenticationURI(logger *zap.Logger, OIDCClientID, codeVerifier string, configuration *OIDCResponse) *AuthenticationURI {
+func NewAuthenticationURI(logger *zap.Logger, oidcClientID, codeVerifier string, configuration *OIDCResponse) *AuthenticationURI {
 	return &AuthenticationURI{
-		logger: logger,
+		logger:       logger,
 		authEndpoint: configuration.AuthorizationEndpoint,
-		oidcClientID: OIDCClientID,
+		oidcClientID: oidcClientID,
 		codeVerifier: codeVerifier,
 	}
 }
@@ -74,7 +73,7 @@ func (r AuthenticationURI) Handle() (authURI string, err error) {
 	qs.Set("code_challenge_method", codeChallengeMethod)
 	qs.Set("access_type", "offline")
 
-	authUrl := url.URL{
+	authURL := url.URL{
 		Scheme:     u.Scheme,
 		Host:       u.Host,
 		Path:       u.Path,
@@ -86,5 +85,5 @@ func (r AuthenticationURI) Handle() (authURI string, err error) {
 		}(qs.Encode()),
 	}
 
-	return authUrl.String(), nil
+	return authURL.String(), nil
 }

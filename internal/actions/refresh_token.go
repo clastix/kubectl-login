@@ -43,6 +43,7 @@ func NewRefreshToken(logger *zap.Logger, insecureSkipVerify bool, refreshEndpoin
 		client: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
+					//nolint:gosec
 					InsecureSkipVerify: insecureSkipVerify,
 				},
 			},
@@ -56,22 +57,16 @@ func (r RefreshToken) Handle() (idToken, refresh string, err error) {
 	d.Add("refresh_token", r.refreshToken)
 	d.Add("client_id", r.oidcClientID)
 
-	var tokenUrl *url.URL
-	tokenUrl, err = url.Parse(r.refreshEndpoint)
+	var tokenURL *url.URL
+	tokenURL, err = url.Parse(r.refreshEndpoint)
 	if err != nil {
 		r.logger.Error("Cannot retrieve OIDC token due to non well-formed endpoint", zap.Error(err), zap.String("refreshEndpoint", r.refreshEndpoint))
 		return
 	}
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := &http.Client{Transport: tr}
-
 	var res *http.Response
-	if res, err = client.Post(tokenUrl.String(), "application/x-www-form-urlencoded", strings.NewReader(d.Encode())); err != nil {
-		r.logger.Error("Cannot reach the server", zap.Error(err), zap.String("uri", tokenUrl.String()))
+	if res, err = r.client.Post(tokenURL.String(), "application/x-www-form-urlencoded", strings.NewReader(d.Encode())); err != nil {
+		r.logger.Error("Cannot reach the server", zap.Error(err), zap.String("uri", tokenURL.String()))
 		return
 	}
 	defer func() { _ = res.Body.Close() }()
