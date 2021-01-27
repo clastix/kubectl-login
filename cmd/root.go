@@ -74,7 +74,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v, _ := cmd.Flags().GetString(flagsMap[K8SAPIServer]); len(v) > 0 {
 			viper.Set(K8SAPIServer, v)
 		}
-		if v, _ := cmd.Flags().GetBool(flagsMap[K8SCertificateAuthorityPath]); true {
+		if v, _ := cmd.Flags().GetBool(flagsMap[K8SSkipTlsVerify]); true {
 			viper.Set(K8SSkipTlsVerify, v)
 		}
 		if v, _ := cmd.Flags().GetString(flagsMap[K8SCertificateAuthorityPath]); len(v) > 0 {
