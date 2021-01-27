@@ -2,7 +2,7 @@
 
 `kubectl-login` is a CLI utility to discover and securely login Kubernetes clusters across multiple operating environments, including loacal setups and cloud providers, i.e. EKS, AKS, GKE. It can be used as `kubectl` plugin or as standalone binary.
 
-Based on the configured authentication mechanism, e.g. TLS client, OIDC, it will login users in the Kubernetes clusters they are allowed to access and generate a `kubeconfig` for a chosen cluster.
+Based on the configured authentication mechanism, e.g. TLS client, OIDC, it will log in users in the Kubernetes clusters they are allowed to access and generate a `kubeconfig` for a chosen cluster.
 
 ## Features
 
@@ -20,9 +20,10 @@ Based on the configured authentication mechanism, e.g. TLS client, OIDC, it will
 
 
 ## Installation
-Install [curl](https://github.com/curl/curl) and [jq](https://stedolan.github.io/jq/) dependencies if you don't already in your system.
 
-Copy the `kubectl-login` script somewhere on your `PATH`, and set it executable:
+Download the release from the GitHub Release section according to your OS and architecture.
+
+Copy the binary somewhere on your `PATH`, and set it executable:
 
 ```bash
 $ chmod u+x kubectl-login`
@@ -58,7 +59,6 @@ Flags:
       --oidc-insecure-skip-tls-verify   Disable TLS certificate verification for the OIDC server
       --oidc-server string              The OIDC server URL to connect to
       --oidc-server-ca-path string      Path to the OIDC server certificate authority PEM encoded file
-  -t, --toggle                          Help message for toggle
   -v, --verbose                         Toggle the verbose logging
 
 Use "login [command] --help" for more information about a command.
@@ -89,35 +89,52 @@ export KUBECONFIG=oidc.kubeconfig
 Happy Kubernetes interaction!
 ```
 
-The initial setup creates and stores configurations in the file `~/.kube/oidc.conf`
+The initial setup creates and stores configurations in the file `~/.kubectl-login.yaml`
 
 ```bash
-API_SERVER=https://cmp.clastix.io
-OIDC_SERVER=https://sso.clastix.io/auth/realms/caas
-OIDC_CLIENT_ID=kubectl
-CODE_CHALLENGE_METHOD=S256
-AUTH_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/auth
-TOKEN_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/token
-INTROSPECTION_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/token/introspect
-USERINFO_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/userinfo
-END_SESSION_ENDPOINT=https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/logout
+kubernetes:
+  ca:
+    insecure: false
+  endpoint: https://cmp.clastix.io
+  kubeconfig: oidc.kubeconfig
+oidc:
+  ca:
+    insecure: false
+  clientid: kubectl
+  server: https://sso.clastix.io/auth/realms/caas
+token:
+  endpoint: https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/token
+  id: REDACTED
+  refresh: REDACTED
 ```
 
 A `kubeconfig` file is created as:
 
 ```yaml
+apiVersion: v1
+clusters:
+  - cluster:
+      server: https://cmp.clastix.io
+    name: kubernetes
+contexts:
+  - context:
+      cluster: kubernetes
+      user: oidc
+    name: oidc
+current-context: oidc
 kind: Config
 preferences: {}
 users:
-- name: oidc
-  user:
-    exec:
-      apiVersion: client.authentication.k8s.io/v1beta1
-      args:
-      - login
-      - --token
-      command: kubectl
-      env: null
+  - name: oidc
+    user:
+      exec:
+        apiVersion: client.authentication.k8s.io/v1beta1
+        args:
+          - login
+          - get-token
+        command: kubectl
+        env: null
+        provideClusterInfo: false
 ...
 ```
 
@@ -135,10 +152,10 @@ example-5b64df8865-z6ts9   1/1     Running   0          13h
 You can start the login process any time by simply running:
 
 ```
-$ kubectl login --login
+$ kubectl login
 ```
 
 
 
 ## Contributions
-`kubectl-login` is released with Apache2 open source license. Contributions are very welcome!
+`kubectl-login` is released with Apache 2 open source license. Contributions are very welcome!
