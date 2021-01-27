@@ -1,29 +1,37 @@
 # Kubernetes Login Manager CLI
 
-`kubectl-login` is a CLI utility to discover and securely login Kubernetes clusters across multiple operating environments, including loacal setups and cloud providers, i.e. EKS, AKS, GKE. It can be used as `kubectl` plugin or as standalone binary.
+This `kubectl-login` is an utility to securely login Kubernetes clusters across multiple operating environments, including loacal setups and cloud providers, i.e. EKS, AKS, GKE. It can be used as `kubectl` plugin or as standalone binary.
 
-Based on the configured authentication mechanism, e.g. TLS client, OIDC, it will log in users in the Kubernetes clusters they are allowed to access and generate a `kubeconfig` for a chosen cluster.
+Based on the configured authentication mechanism (e.g. TLS client, OIDC), it will login users in the Kubernetes clusters they are allowed to access and generate a `kubeconfig` for a chosen cluster.
 
 ## Features
 
-- [ ] Authenticate using TLS client certificates
-- [x] Authenticate using OIDC
-    - [x] Authorization Code Grant
+- [ ] Authenticate with TLS client certificates
+- [x] Authenticate against OIDC Server
+    - [ ] Authorization Code Grant
     - [x] Authorization Code Grant with PKCE
-    - [x] Authorization with Resource Owner Password
+    - [ ] Authorization with Resource Owner Password
+    - [ ] Authorization with Credentials
+    - [ ] Device Authorization Grant
 - [ ] Authenticate against GKE
 - [ ] Authenticate against EKS
 - [ ] Authenticate against AKS
 - [x] Create `kubeconfig`
-- [ ] Configure login parameters
+- [x] Configure login parameters
 - [ ] Store historical login parameters
 
 
 ## Installation
 
-Download the release from the GitHub Release section according to your OS and architecture.
+Download the release from the GitHub Release section according to your OS and architecture:
 
-Copy the binary somewhere on your `PATH`, and set it executable:
+- [x] Darwin_x86_64
+- [x] Linux_arm64
+- [x] Linux_i386
+- [x] Linux_x86_64
+- [ ] Windows_x86_64
+
+On Linux/MacOS systems, copy the binary somewhere on your `PATH`, and set it executable:
 
 ```bash
 $ chmod u+x kubectl-login`
@@ -67,20 +75,20 @@ Use "login [command] --help" for more information about a command.
 Create an initial setup:
 
 ```
-$ kubectl login --k8s-api-server=https://cmp.clastix.io --k8s-server-ca-path=/path/to/k8s/ca.pem --oidc-server=https://sso.clastix.io/auth/realms/caas --oidc-client-id=kubectl -v
+$ kubectl login --k8s-api-server=https://kube-apiserver:6443 --k8s-server-ca-path=/path/to/k8s/ca.pem --oidc-server=https://sso.clastix.io --oidc-client-id=kubectl -v
 2021-01-27T18:15:16.988Z        INFO    cmd/root.go:102 Starting the login procedure
 2021-01-27T18:15:16.988Z        INFO    actions/oidc_config.go:63       Starting OIDC login with PKCE
-2021-01-27T18:15:16.988Z        INFO    actions/oidc_config.go:74       Getting OIDC configuration from the server      {"OIDCServer": "https://sso.clastix.io/auth/realms/caas"}
+2021-01-27T18:15:16.988Z        INFO    actions/oidc_config.go:74       Getting OIDC configuration from the server      {"OIDCServer": "https://sso.clastix.io"}
 2021-01-27T18:15:17.022Z        INFO    actions/code_verifier.go:38     Generating PKCE Code Verifier and Challenge
 2021-01-27T18:15:17.022Z        INFO    actions/code_verifier.go:39     PKCE code verifier generated    {"code": "PZD4n80AepGINMw1au4fMj73K0R38EXyPGd0QhmsIF3a3KRU3NBh2QwzSd9PAQ5dt1JifcbaixysCXIAQKhkV0lPituFgtTeWBIcWFmrfMCwvt8Cni2OP6vTc3sWOgPe"}
 2021-01-27T18:15:17.023Z        INFO    actions/create_auth_uri.go:45   Creating authorization URI
 
 Proceed to login to the following link using your browser:
 
-https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/auth?access_type=offline&client_id=kubectl&code_challenge=EYpNK9lNI3g9ridirZLUxzZZC4uJPdIIdheVOYHZReY&code_challenge_method=S256&prompt=consent&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=openid+groups+offline_access&state=TDE5a90dfVLyeXxaHIbExowZoa344IztYcPXRgX0M
+https://sso.clastix.io/openid-connect/auth?access_type=offline&client_id=kubectl&code_challenge=EYpNK9lNI3g9ridirZLUxzZZC4uJPdIIdheVOYHZReY&code_challenge_method=S256&prompt=consent&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=openid+groups+offline_access&state=TDE5a90dfVLyeXxaHIbExowZoa344IztYcPXRgX0M
 
-Type the verification code: d9938e34-5788-4449-892a-de189a3595a9.5ab118b7-9f2e-4cb7-b7b2-a24d5457ed5c.20c2ccb0-4af6-419b-b1b8-c1118e72236b
-2021-01-27T18:15:28.832Z        DEBUG   cmd/root.go:137 User input code is d9938e34-5788-4449-892a-de189a3595a9.5ab118b7-9f2e-4cb7-b7b2-a24d5457ed5c.20c2ccb0-4af6-419b-b1b8-c1118e72236b
+Type the verification code: *******************
+2021-01-27T18:15:28.832Z        DEBUG   cmd/root.go:137 User input code is *******************
 Your login procedure has been completed!
 
 You can start interacting with your Kubernetes cluster using the generated kubeconfig file:
@@ -95,15 +103,15 @@ The initial setup creates and stores configurations in the file `~/.kubectl-logi
 kubernetes:
   ca:
     insecure: false
-  endpoint: https://cmp.clastix.io
+  endpoint: https://kube-apiserver:6443
   kubeconfig: oidc.kubeconfig
 oidc:
   ca:
     insecure: false
   clientid: kubectl
-  server: https://sso.clastix.io/auth/realms/caas
+  server: https://sso.clastix.io
 token:
-  endpoint: https://sso.clastix.io/auth/realms/caas/protocol/openid-connect/token
+  endpoint: https://sso.clastix.io/openid-connect/token
   id: REDACTED
   refresh: REDACTED
 ```
@@ -114,7 +122,7 @@ A `kubeconfig` file is created as:
 apiVersion: v1
 clusters:
   - cluster:
-      server: https://cmp.clastix.io
+      server: https://kube-apiserver:6443
     name: kubernetes
 contexts:
   - context:
@@ -154,8 +162,6 @@ You can start the login process any time by simply running:
 ```
 $ kubectl login
 ```
-
-
 
 ## Contributions
 `kubectl-login` is released with Apache 2 open source license. Contributions are very welcome!
