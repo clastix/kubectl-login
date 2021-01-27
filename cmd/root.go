@@ -243,7 +243,6 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kubectl-login.yaml)")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Toggle the verbose logging")
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
 	rootCmd.PersistentFlags().String(flagsMap[OIDCServer], "", "The OIDC server URL to connect to")
 	rootCmd.PersistentFlags().String(flagsMap[OIDCClientID], "", "The OIDC client ID provided")
