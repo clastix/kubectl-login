@@ -17,17 +17,18 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/tcnksm/go-input"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -128,18 +129,13 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		fmt.Println(url)
 		fmt.Println("")
 
-		ui := &input.UI{
-			Writer: os.Stdout,
-			Reader: os.Stdin,
-		}
 		var code string
-		code, err = ui.Ask("Enter verification code", &input.Options{
-			Default: "",
-			Required: true,
-		})
-		if err != nil {
-			return err
-		}
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Type the verification code: ")
+		code, _ = reader.ReadString('\n')
+		code = strings.TrimSuffix(code, "\n")
+
+		logger.Debug("User input code is " + code)
 
 		var token, refresh string
 		token, refresh, err = actions.NewGetToken(logger, res.TokenEndpoint, viper.GetString(OIDCClientID), code, pkce, client).Handle()
