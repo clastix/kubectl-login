@@ -64,7 +64,8 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v, _ := cmd.Flags().GetString(flagsMap[OIDCClientID]); len(v) > 0 {
 			viper.Set(OIDCClientID, v)
 		}
-		if v, _ := cmd.Flags().GetBool(flagsMap[OIDCSkipTlsVerify]); true {
+		if cmd.Flag(flagsMap[OIDCSkipTlsVerify]).Changed {
+			v, _ := cmd.Flags().GetBool(flagsMap[OIDCSkipTlsVerify])
 			viper.Set(OIDCSkipTlsVerify, v)
 		}
 		if v, _ := cmd.Flags().GetString(flagsMap[OIDCCertificateAuthority]); len(v) > 0 {
@@ -74,7 +75,8 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v, _ := cmd.Flags().GetString(flagsMap[K8SAPIServer]); len(v) > 0 {
 			viper.Set(K8SAPIServer, v)
 		}
-		if v, _ := cmd.Flags().GetBool(flagsMap[K8SSkipTlsVerify]); true {
+		if cmd.Flag(flagsMap[K8SSkipTlsVerify]).Changed {
+			v, _ := cmd.Flags().GetBool(flagsMap[K8SSkipTlsVerify])
 			viper.Set(K8SSkipTlsVerify, v)
 		}
 		if v, _ := cmd.Flags().GetString(flagsMap[K8SCertificateAuthorityPath]); len(v) > 0 {
@@ -244,14 +246,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kubectl-login.yaml)")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Toggle the verbose logging")
 
-	rootCmd.PersistentFlags().String(flagsMap[OIDCServer], "", "The OIDC server URL to connect to")
-	rootCmd.PersistentFlags().String(flagsMap[OIDCClientID], "", "The OIDC client ID provided")
-	rootCmd.PersistentFlags().Bool(flagsMap[OIDCSkipTlsVerify], false, "Disable TLS certificate verification for the OIDC server")
-	rootCmd.PersistentFlags().String(flagsMap[OIDCCertificateAuthority], "", "Path to the OIDC server certificate authority PEM encoded file")
+	rootCmd.PersistentFlags().String(flagsMap[OIDCServer], viper.GetString(OIDCServer), "The OIDC server URL to connect to")
+	rootCmd.PersistentFlags().String(flagsMap[OIDCClientID], viper.GetString(OIDCClientID), "The OIDC client ID provided")
+	rootCmd.PersistentFlags().Bool(flagsMap[OIDCSkipTlsVerify], viper.GetBool(OIDCSkipTlsVerify), "Disable TLS certificate verification for the OIDC server")
+	rootCmd.PersistentFlags().String(flagsMap[OIDCCertificateAuthority], viper.GetString(OIDCCertificateAuthority), "Path to the OIDC server certificate authority PEM encoded file")
 
-	rootCmd.PersistentFlags().String(flagsMap[K8SAPIServer], "", "Endpoint of the Kubernetes API server to connect to")
-	rootCmd.PersistentFlags().Bool(flagsMap[K8SSkipTlsVerify], false, "Disable TLS certificate verification for the Kubernetes API server")
-	rootCmd.PersistentFlags().String(flagsMap[K8SCertificateAuthorityPath], "", "Path to the Kubernetes API server certificate authority PEM encoded file")
+	rootCmd.PersistentFlags().String(flagsMap[K8SAPIServer], viper.GetString(K8SAPIServer), "Endpoint of the Kubernetes API server to connect to")
+	rootCmd.PersistentFlags().Bool(flagsMap[K8SSkipTlsVerify], viper.GetBool(K8SSkipTlsVerify), "Disable TLS certificate verification for the Kubernetes API server")
+	rootCmd.PersistentFlags().String(flagsMap[K8SCertificateAuthorityPath], viper.GetString(K8SCertificateAuthorityPath), "Path to the Kubernetes API server certificate authority PEM encoded file")
 
 	rootCmd.PersistentFlags().String(flagsMap[KubeconfigPath], "oidc.kubeconfig", "Path to the generated kubeconfig file upon resulting login procedure to access the Kubernetes cluster")
 }
