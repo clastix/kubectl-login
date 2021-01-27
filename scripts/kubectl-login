@@ -2,7 +2,7 @@
 
 # An OIDC Identity Provider issues you three types of tokens:
 # - refresh-token
-# - id-token
+# - id-token
 # - access-token
 # The access-token can generally be disregarded for Kubernetes.
 # It would be used if the Identity Provider was managing roles and permissions,
@@ -102,9 +102,9 @@ gen_pkce() {
     echo "[$(date)][INFO] Generating PKCE Code Verifier and Challenge"
     # Length of code_verifier should be no less than 43 characters and no more than 128 characters,
     # and Base64URL encoded
-    CODE_VERIFIER=`openssl rand -base64 50 | tr -dc A-Za-z0-9` 
+    CODE_VERIFIER=`openssl rand -base64 50 | tr -dc A-Za-z0-9`
     # challenge = base64url(sha256(code_verifier))
-	CODE_CHALLENGE=`echo -n ${CODE_VERIFIER} | shasum -a 256 | cut -d " " -f 1 | xxd -r -p | base64 | tr / _ | tr + - | tr -d =`
+    CODE_CHALLENGE=`echo -n ${CODE_VERIFIER} | sha256sum | cut -d " " -f 1 | xxd -r -p | base64 | tr / _ | tr + - | tr -d =`
 }
 
 create_auth_uri() {
@@ -148,7 +148,7 @@ get_token() {
     # We should set a configuration option to distinguish if
     # the OIDC_CLIENT_SECRET is necessary (confidential client) or not (public client)
     # -d client_secret=$OIDC_CLIENT_SECRET
-    
+
     TOKEN=`curl -k -s $TOKEN_ENDPOINT \
     -d grant_type=authorization_code \
     -d response_type=id_token \
@@ -267,7 +267,7 @@ token() {
         TOKEN=`cat ${CACHE}`
         ID_TOKEN=`echo ${TOKEN} | jq .id_token -r`
         local exp=$(exp_jwt $ID_TOKEN)
-        local timestamp=$(date -r $exp +%FT%TZ)
+        #local timestamp=$(date -R $exp +%FT%TZ)
         if [ $(date +%s) -ge $exp ]; then
 
             # refreshing the token from server"
@@ -289,7 +289,7 @@ token() {
             ID_TOKEN=`echo ${TOKEN} | jq .id_token -r`
         fi
         # return the id_token to kubectl
-        echo '{"apiVersion": "client.authentication.k8s.io/v1beta1", "kind": "ExecCredential", "status": {"token": "'${ID_TOKEN}'", "expirationTimestamp": "'${timestamp}'"}}'
+        echo '{"apiVersion": "client.authentication.k8s.io/v1beta1", "kind": "ExecCredential", "status": {"token": "'${ID_TOKEN}'"}}'
     else
         echo "[$(date)][INFO]  Refresh the token." >&2
         echo "[$(date)][INFO]  Open a terminal and run: kubectl oidc --login" >&2
