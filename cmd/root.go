@@ -23,11 +23,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/manifoldco/promptui"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/tcnksm/go-input"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -128,17 +128,16 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		fmt.Println(url)
 		fmt.Println("")
 
-		prompt := promptui.Prompt{
-			Label: "Enter verification code",
-			Validate: func(s string) (err error) {
-				if len(s) == 0 {
-					err = fmt.Errorf("an empty string is not a valid code")
-				}
-				return
-			},
+		ui := &input.UI{
+			Writer: os.Stdout,
+			Reader: os.Stdin,
 		}
 		var code string
-		if code, err = prompt.Run(); err != nil {
+		code, err = ui.Ask("Enter verification code", &input.Options{
+			Default: "",
+			Required: true,
+		})
+		if err != nil {
 			return err
 		}
 
@@ -224,10 +223,9 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 			return errors.New(msg)
 		}
 
-		fmt.Println("")
 		fmt.Println("Your login procedure has been completed!")
 		fmt.Println("")
-		fmt.Println("You can start interacting with your Kuberneter cluster using the generated kubeconfig file:")
+		fmt.Println("You can start interacting with your Kubernetes cluster using the generated kubeconfig file:")
 		fmt.Printf("export KUBECONFIG=%s", path)
 		fmt.Println("")
 		fmt.Println("")
