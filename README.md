@@ -25,13 +25,16 @@ Based on the configured authentication mechanism (e.g. TLS client, OIDC), it wil
 
 Download the release from the GitHub Release section according to your OS and architecture:
 
+- [x] Darwin_i386
 - [x] Darwin_x86_64
 - [x] Linux_arm64
+- [x] Linux_armv6
 - [x] Linux_i386
 - [x] Linux_x86_64
-- [ ] Windows_x86_64
+- [x] Windows_i386
+- [x] Windows_x86_64
 
-On Linux/MacOS systems, copy the binary somewhere on your `PATH`, and set it executable:
+Copy the binary somewhere on your `PATH`, and ensure it's executable:
 
 ```bash
 $ chmod u+x kubectl-login`
