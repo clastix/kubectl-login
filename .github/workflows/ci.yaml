@@ -18,3 +18,13 @@ jobs:
           version: latest
           only-new-issues: false
           args: --timeout 2m --config .golangci.yml
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v2
+        with:
+          firstParent: true
+
