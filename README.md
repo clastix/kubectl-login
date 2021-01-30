@@ -67,6 +67,7 @@ Flags:
       --k8s-server-ca-path string       Path to the Kubernetes API server certificate authority PEM encoded file
       --kubeconfig-path string          Path to the generated kubeconfig file upon resulting login procedure to access the Kubernetes cluster (default "oidc.kubeconfig")
       --oidc-client-id string           The OIDC client ID provided
+      --oidc-client-timeout duration    Define the timeout in duration for the HTTP requests to the OIDC server
       --oidc-insecure-skip-tls-verify   Disable TLS certificate verification for the OIDC server
       --oidc-server string              The OIDC server URL to connect to
       --oidc-server-ca-path string      Path to the OIDC server certificate authority PEM encoded file
