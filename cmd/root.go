@@ -64,6 +64,11 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v, _ := cmd.Flags().GetString(flagsMap[OIDCClientID]); len(v) > 0 {
 			viper.Set(OIDCClientID, v)
 		}
+
+		if cmd.Flag(flagsMap[OIDCTimeoutDuration]).Changed {
+			v, _ := cmd.Flags().GetDuration(flagsMap[OIDCTimeoutDuration])
+			viper.Set(OIDCTimeoutDuration, v)
+		}
 		if cmd.Flag(flagsMap[OIDCSkipTLSVerify]).Changed {
 			v, _ := cmd.Flags().GetBool(flagsMap[OIDCSkipTLSVerify])
 			viper.Set(OIDCSkipTLSVerify, v)
@@ -106,7 +111,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 
 		// Creating OIDC server HTTP client with TLS handling
 		var client *oidc.HTTPClient
-		client, err = oidc.NewHTTPClient(viper.GetString(OIDCCertificateAuthority), viper.GetBool(OIDCSkipTLSVerify))
+		client, err = oidc.NewHTTPClient(viper.GetString(OIDCCertificateAuthority), viper.GetDuration(OIDCTimeoutDuration), viper.GetBool(OIDCSkipTLSVerify))
 		if err != nil {
 			return
 		}
@@ -246,6 +251,7 @@ func init() {
 	rootCmd.PersistentFlags().String(flagsMap[OIDCServer], viper.GetString(OIDCServer), "The OIDC server URL to connect to")
 	rootCmd.PersistentFlags().String(flagsMap[OIDCClientID], viper.GetString(OIDCClientID), "The OIDC client ID provided")
 	rootCmd.PersistentFlags().Bool(flagsMap[OIDCSkipTLSVerify], viper.GetBool(OIDCSkipTLSVerify), "Disable TLS certificate verification for the OIDC server")
+	rootCmd.PersistentFlags().Duration(flagsMap[OIDCTimeoutDuration], viper.GetDuration(OIDCTimeoutDuration), "Define the timeout in duration for the HTTP requests to the OIDC server")
 	rootCmd.PersistentFlags().String(flagsMap[OIDCCertificateAuthority], viper.GetString(OIDCCertificateAuthority), "Path to the OIDC server certificate authority PEM encoded file")
 
 	rootCmd.PersistentFlags().String(flagsMap[K8SAPIServer], viper.GetString(K8SAPIServer), "Endpoint of the Kubernetes API server to connect to")

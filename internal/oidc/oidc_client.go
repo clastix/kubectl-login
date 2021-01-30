@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/spf13/afero"
 )
@@ -52,9 +53,10 @@ type HTTPClient struct {
 	http.Client
 }
 
-func NewHTTPClient(certificateAuthorityPath string, insecureSkipVerify bool) (client *HTTPClient, err error) {
+func NewHTTPClient(certificateAuthorityPath string, timeout time.Duration, insecureSkipVerify bool) (client *HTTPClient, err error) {
 	return &HTTPClient{
 		Client: http.Client{
+			Timeout: timeout,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					//nolint:gosec
