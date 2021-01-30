@@ -18,7 +18,6 @@ package actions
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -60,35 +59,26 @@ func NewOIDCConfiguration(logger *zap.Logger, oidcClient *oidc.HTTPClient) *PKCE
 }
 
 func (r PKCELogin) Handle(oidcServer string) (response *OIDCResponse, err error) {
-	r.logger.Info("Starting OIDC login with PKCE")
-
-	response, err = r.GetOpenIDConfig(oidcServer)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (r PKCELogin) GetOpenIDConfig(oidcServer string) (out *OIDCResponse, err error) {
 	r.logger.Info("Getting OIDC configuration from the server", zap.String("OIDCServer", oidcServer))
 
 	var res *http.Response
 	res, err = r.client.Get(fmt.Sprintf("%s/.well-known/openid-configuration", oidcServer))
 	if err != nil {
-		r.logger.Error("Cannot get OIDC configuration from the server", zap.String("OIDCServer", oidcServer), zap.Error(err))
+		r.logger.Error("the server returned an error", zap.String("OIDCServer", oidcServer), zap.Error(err))
+		err = fmt.Errorf("the server returned an error")
 		return
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	out = &OIDCResponse{}
+	response = &OIDCResponse{}
 	b, _ := ioutil.ReadAll(res.Body)
-	if err = json.Unmarshal(b, out); err != nil {
-		r.logger.Error("Cannot unmarshal OIDC configuration", zap.String("OIDCServer", oidcServer), zap.Error(err))
+	if err = json.Unmarshal(b, response); err != nil {
+		r.logger.Error("Cannot unmarshal OIDC configuration", zap.String("OIDCServer", oidcServer), zap.Error(err), zap.ByteString("body", b))
+		err = fmt.Errorf("the response body is not a valid JSON")
 		return
 	}
-	if len(out.Error) > 0 {
-		err = errors.New(out.Error)
+	if len(response.Error) > 0 {
+		err = fmt.Errorf("server returned the error %s", response.Error)
 	}
 
 	return

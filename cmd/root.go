@@ -114,7 +114,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		// Gathering the OIDC server configuration
 		var res *actions.OIDCResponse
 		if res, err = actions.NewOIDCConfiguration(logger, client).Handle(viper.GetString(OIDCServer)); err != nil {
-			return err
+			return fmt.Errorf("cannot obtain the OIDC configuration (%w)", err)
 		}
 
 		pkce := actions.NewCodeVerifier(logger).Handle()
@@ -122,7 +122,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		var url string
 		url, err = actions.NewAuthenticationURI(logger, viper.GetString(OIDCClientID), pkce, res).Handle()
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot generate the authentatication URI (%w)", err)
 		}
 
 		fmt.Println("")
@@ -142,7 +142,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		var token, refresh string
 		token, refresh, err = actions.NewGetToken(logger, res.TokenEndpoint, viper.GetString(OIDCClientID), code, pkce, client).Handle()
 		if err != nil {
-			return fmt.Errorf("cannot proceed to login due to an error: %w", err)
+			return fmt.Errorf("cannot proceed to login due to an error (%w)", err)
 		}
 
 		viper.Set(TokenEndpoint, res.TokenEndpoint)
@@ -198,7 +198,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 			},
 		}
 		if err != nil {
-			return fmt.Errorf("cannot read Kubernetes CA from file: %w", err)
+			return fmt.Errorf("cannot read Kubernetes CA from file (%w)", err)
 		}
 
 		scheme := runtime.NewScheme()
@@ -216,9 +216,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		path, _ := cmd.Flags().GetString("kubeconfig-path")
 
 		if err = afero.WriteFile(afero.NewOsFs(), path, a.Bytes(), os.ModePerm); err != nil {
-			msg := "cannot save generated kubeconfig"
-			logger.Error(msg, zap.Error(err))
-			return errors.New(msg)
+			return fmt.Errorf("cannot save generated kubeconfig (%w)", err)
 		}
 
 		fmt.Println("Your login procedure has been completed!")
@@ -235,7 +233,6 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }

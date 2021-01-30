@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"net/url"
 	"regexp"
 
@@ -59,6 +60,7 @@ func (r AuthenticationURI) Handle() (authURI string, err error) {
 	u, err = url.Parse(r.authEndpoint)
 	if err != nil {
 		r.logger.Error("Cannot parse auth endpoint", zap.String("authEndpoint", r.authEndpoint), zap.Error(err))
+		err = fmt.Errorf("non well-formed endpoint")
 		return
 	}
 
