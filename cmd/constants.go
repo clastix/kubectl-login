@@ -25,6 +25,7 @@ const (
 	// OIDC viper keys
 	OIDCServer               = "oidc.server"
 	OIDCClientID             = "oidc.clientid"
+	OIDCTimeoutDuration      = "oidc.timeout"
 	OIDCSkipTLSVerify        = "oidc.ca.insecure"
 	OIDCCertificateAuthority = "oidc.ca.path"
 	// Token viper keys
@@ -38,6 +39,7 @@ var (
 		// OIDC flags
 		OIDCServer:               "oidc-server",
 		OIDCClientID:             "oidc-client-id",
+		OIDCTimeoutDuration:      "oidc-client-timeout",
 		OIDCSkipTLSVerify:        "oidc-insecure-skip-tls-verify",
 		OIDCCertificateAuthority: "oidc-server-ca-path",
 		// Kubernetes flags
