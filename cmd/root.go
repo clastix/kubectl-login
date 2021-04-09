@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -30,16 +29,26 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
-	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/clastix/kubectl-login/internal/actions"
 	"github.com/clastix/kubectl-login/internal/oidc"
 )
 
 var cfgFile string
+
+var defaultKubeConfigPath = func() string {
+	if c := os.Getenv("KUBECONFIG"); len(c) > 0 {
+		return c
+	}
+	home, _ := homedir.Dir()
+	p := path.Join(home, ".kube", "config")
+	if ok, _ := afero.Exists(afero.NewOsFs(), p); !ok {
+		_ = afero.WriteFile(afero.NewOsFs(), p, []byte{}, 0600)
+	}
+	return p
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "login",
@@ -100,9 +109,6 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		if v := viper.GetString(K8SAPIServer); len(v) == 0 {
 			return errors.New("missing Kubernetes API server")
 		}
-		if v := viper.GetString(KubeconfigPath); len(v) == 0 {
-			return errors.New("missing path to the resulting kubeconfig")
-		}
 
 		return nil
 	},
@@ -160,75 +166,52 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 			}
 		}()
 
-		config := &v1.Config{
-			Kind:           "Config",
-			APIVersion:     "v1",
-			CurrentContext: "oidc",
-			Clusters: []v1.NamedCluster{
-				{
-					Name: "kubernetes",
-					Cluster: v1.Cluster{
-						Server:                viper.GetString(K8SAPIServer),
-						InsecureSkipTLSVerify: viper.GetBool(K8SSkipTLSVerify),
-						CertificateAuthorityData: func() (b []byte) {
-							if viper.GetBool(K8SSkipTLSVerify) {
-								return nil
-							}
-							b, err = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
-							return
-						}(),
-					},
-				},
-			},
-			Contexts: []v1.NamedContext{
-				{
-					Name: "oidc",
-					Context: v1.Context{
-						Cluster:  "kubernetes",
-						AuthInfo: "oidc",
-					},
-				},
-			},
-			AuthInfos: []v1.NamedAuthInfo{
-				{
-					Name: "oidc",
-					AuthInfo: v1.AuthInfo{
-						Exec: &v1.ExecConfig{
-							Command:    "kubectl",
-							Args:       []string{"login", tokenCmd.Use},
-							APIVersion: "client.authentication.k8s.io/v1beta1",
-						},
-					},
-				},
+		var p string
+		if p = viper.GetString(KubeconfigPath); len(p) == 0 {
+			p = defaultKubeConfigPath()
+		}
+		var cfg *clientcmdapi.Config
+		var cfgErr error
+		if cfg, cfgErr = clientcmd.LoadFromFile(p); cfgErr != nil {
+			cfg, _ = clientcmd.Load(nil)
+		}
+
+		cfg.CurrentContext = "oidc"
+		cfg.Clusters["kubernetes"] = &clientcmdapi.Cluster{
+			Server:                viper.GetString(K8SAPIServer),
+			InsecureSkipTLSVerify: viper.GetBool(K8SSkipTLSVerify),
+			CertificateAuthorityData: func() (b []byte) {
+				if viper.GetBool(K8SSkipTLSVerify) {
+					return nil
+				}
+				b, err = afero.ReadFile(afero.NewOsFs(), viper.GetString(K8SCertificateAuthorityPath))
+				return
+			}(),
+		}
+		cfg.Contexts["oidc"] = &clientcmdapi.Context{
+			Cluster:  "kubernetes",
+			AuthInfo: "oidc",
+		}
+		cfg.AuthInfos["oidc"] = &clientcmdapi.AuthInfo{
+			Exec: &clientcmdapi.ExecConfig{
+				Command:    "kubectl",
+				Args:       []string{"login", tokenCmd.Use},
+				APIVersion: "client.authentication.k8s.io/v1beta1",
 			},
 		}
 		if err != nil {
 			return fmt.Errorf("cannot read Kubernetes CA from file (%w)", err)
 		}
 
-		scheme := runtime.NewScheme()
-		e := json.NewSerializerWithOptions(yaml.SimpleMetaFactory{}, scheme, scheme, json.SerializerOptions{
-			Yaml:   true,
-			Pretty: true,
-			Strict: false,
-		})
-
-		a := bytes.NewBuffer([]byte{})
-		if err = e.Encode(config, a); err != nil {
-			return fmt.Errorf("cannot encode kubeconfig to YAML (%w)", err)
-		}
-
-		path, _ := cmd.Flags().GetString("kubeconfig-path")
-
-		if err = afero.WriteFile(afero.NewOsFs(), path, a.Bytes(), os.ModePerm); err != nil {
+		if err = clientcmd.WriteToFile(*cfg, p); err != nil {
 			return fmt.Errorf("cannot save generated kubeconfig (%w)", err)
 		}
 
 		fmt.Println("Your login procedure has been completed!")
 		fmt.Println("")
-		fmt.Println("You can start interacting with your Kubernetes cluster using the generated kubeconfig file:")
-		fmt.Printf("export KUBECONFIG=%s", path)
+		fmt.Printf("The Kubernetes configuration file has been merged in your current export KUBECONFIG: %s", p)
 		fmt.Println("")
+
 		fmt.Println("")
 		fmt.Println("Happy Kubernetes interaction!")
 
@@ -258,7 +241,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool(flagsMap[K8SSkipTLSVerify], viper.GetBool(K8SSkipTLSVerify), "Disable TLS certificate verification for the Kubernetes API server")
 	rootCmd.PersistentFlags().String(flagsMap[K8SCertificateAuthorityPath], viper.GetString(K8SCertificateAuthorityPath), "Path to the Kubernetes API server certificate authority PEM encoded file")
 
-	rootCmd.PersistentFlags().String(flagsMap[KubeconfigPath], "oidc.kubeconfig", "Path to the generated kubeconfig file upon resulting login procedure to access the Kubernetes cluster")
+	rootCmd.PersistentFlags().String(flagsMap[KubeconfigPath], "", "Path to the generated kubeconfig file upon resulting login procedure to access the Kubernetes cluster, leave empty for the KUBECONFIG environment variable or default location ($HOME/.kube/config)")
 }
 
 // initConfig reads in config file and ENV variables if set.
