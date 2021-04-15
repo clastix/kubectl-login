@@ -127,10 +127,10 @@ apiVersion: v1
 clusters:
   - cluster:
       server: https://kube-apiserver:6443
-    name: kubernetes
+    name: http_kube-apiserver_6443
 contexts:
   - context:
-      cluster: kubernetes
+      cluster: http_kube-apiserver_6443
       user: oidc
     name: oidc
 current-context: oidc
