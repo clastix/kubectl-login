@@ -120,7 +120,7 @@ token:
   refresh: REDACTED
 ```
 
-A `kubeconfig` file is created as:
+The resulting generated Kubernetes configuration file will be saved and merged to the specified path, using the CLI/configuration file option, or fallbacking to the exported `KUBECONFIG` environment variable, or finally to the default location `$HOME/.kube/config`, as follows:
 
 ```yaml
 apiVersion: v1
@@ -135,7 +135,6 @@ contexts:
     name: oidc
 current-context: oidc
 kind: Config
-preferences: {}
 users:
   - name: oidc
     user:
@@ -145,12 +144,9 @@ users:
           - login
           - get-token
         command: kubectl
-        env: null
-        provideClusterInfo: false
-...
 ```
 
-To use it, export or copy in your default location
+In case of different export path using `--kubeconfig-path` or configuration file option `kubernetes.kubeconfig`, export the path as `KUBECONFIG`.
 
 ```
 $ export KUBECONFIG=oidc.kubeconfig
