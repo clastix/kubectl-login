@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -130,8 +131,8 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 
 		pkce := actions.NewCodeVerifier(logger).Handle()
 
-		var url string
-		url, err = actions.NewAuthenticationURI(logger, viper.GetString(OIDCClientID), pkce, res).Handle()
+		var loginURL string
+		loginURL, err = actions.NewAuthenticationURI(logger, viper.GetString(OIDCClientID), pkce, res).Handle()
 		if err != nil {
 			return fmt.Errorf("cannot generate the authentatication URI (%w)", err)
 		}
@@ -139,7 +140,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 		fmt.Println("")
 		fmt.Println("Proceed to login to the following link using your browser:")
 		fmt.Println("")
-		fmt.Println(url)
+		fmt.Println(loginURL)
 		fmt.Println("")
 
 		var code string
@@ -176,8 +177,11 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 			cfg, _ = clientcmd.Load(nil)
 		}
 
+		u, _ := url.Parse(viper.GetString(K8SAPIServer))
+		name := strings.Join([]string{u.Scheme, u.Hostname(), u.Port()}, "_")
+
 		cfg.CurrentContext = "oidc"
-		cfg.Clusters["kubernetes"] = &clientcmdapi.Cluster{
+		cfg.Clusters[name] = &clientcmdapi.Cluster{
 			Server:                viper.GetString(K8SAPIServer),
 			InsecureSkipTLSVerify: viper.GetBool(K8SSkipTLSVerify),
 			CertificateAuthorityData: func() (b []byte) {
@@ -189,7 +193,7 @@ they are allowed to access and generate a kubeconfig for a chosen cluster.`,
 			}(),
 		}
 		cfg.Contexts["oidc"] = &clientcmdapi.Context{
-			Cluster:  "kubernetes",
+			Cluster:  name,
 			AuthInfo: "oidc",
 		}
 		cfg.AuthInfos["oidc"] = &clientcmdapi.AuthInfo{
