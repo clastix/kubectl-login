@@ -68,7 +68,7 @@ func (r AuthenticationURI) Handle() (authURI string, err error) {
 	qs.Set("response_type", "code")
 	qs.Set("client_id", r.oidcClientID)
 	qs.Set("redirect_uri", "urn:ietf:wg:oauth:2.0:oob")
-	qs.Set("scope", "openid+groups+offline_access")
+	qs.Set("scope", "openid+profile+groups+offline_access")
 	qs.Set("state", state)
 	qs.Set("prompt", "consent")
 	qs.Set("code_challenge", codeChallenge)
