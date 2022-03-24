@@ -1,6 +1,6 @@
 # Kubernetes Login Manager CLI
 
-This `kubectl-login` is an utility to securely login Kubernetes clusters across multiple operating environments, including loacal setups and cloud providers, i.e. EKS, AKS, GKE. It can be used as `kubectl` plugin or as standalone binary.
+This `kubectl-login` is an utility to securely login Kubernetes clusters across multiple operating environments, including local setups and cloud providers, i.e. EKS, AKS, GKE. It can be used as `kubectl` plugin or as standalone binary.
 
 Based on the configured authentication mechanism (e.g. TLS client, OIDC), it will login users in the Kubernetes clusters they are allowed to access and generate a `kubeconfig` for a chosen cluster.
 
